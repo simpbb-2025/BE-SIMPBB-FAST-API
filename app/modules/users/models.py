@@ -17,6 +17,9 @@ class User(Base):
     is_active = Column(Boolean, nullable=False, default=True, server_default="1")
     is_verified = Column(Boolean, nullable=False, default=False, server_default="0")
     hashed_password = Column("password", String(255), nullable=False)
+    verification_code = Column(String(10), nullable=True)
+    verification_code_expires_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
-    is_admin = Column(Boolean, nullable=False, default=False, server_default="0")
+    # Role of the user: 'admin', 'staff', or 'user'
+    role = Column(String(10), nullable=False, default="user", server_default="user")

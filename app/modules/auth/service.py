@@ -51,7 +51,7 @@ async def authenticate_and_issue_token(session: AsyncSession, payload: LoginRequ
         {
             "sub": user.id,
             "email": user.email,
-            "is_admin": bool(user.is_admin),
+            "role": str(getattr(user, "role", "user")),
         },
         expires_delta=expires_delta,
     )

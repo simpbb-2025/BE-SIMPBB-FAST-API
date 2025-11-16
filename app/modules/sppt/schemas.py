@@ -91,3 +91,65 @@ class SpptDetailResponse(BaseResponse):
 
 class SpptBatchResponse(BaseResponse):
     data: List[SpptDetail]
+
+
+# E-SPPT public check
+class EspptRequest(BaseModel):
+    nop: str = Field(min_length=18, max_length=25)
+    ktp: str = Field(min_length=8, max_length=30)
+
+
+class EspptData(BaseModel):
+    spop: SpopResponse
+    subjek_pajak: Optional[SubjekPajakResponse]
+    sppt: SpptDetail
+
+
+class EspptResponse(BaseResponse):
+    data: EspptData
+
+
+# OP Registration (staging)
+class OpRegCreate(BaseModel):
+    # Pemohon (opsional)
+    nama_lengkap: str | None = None
+    alamat_rumah: str | None = None
+    telepon: str | None = None
+    ktp: str | None = None
+
+    # WP/OP (wajib)
+    nama_wp: str
+    alamat_wp: str
+    alamat_op: str
+    kd_propinsi: str = Field(min_length=2, max_length=2)
+    kd_dati2: str = Field(min_length=2, max_length=2)
+    kd_kecamatan: str = Field(min_length=3, max_length=3)
+    kd_kelurahan: str = Field(min_length=3, max_length=3)
+    luas_bumi: int = Field(ge=0)
+    luas_bangunan: int = Field(ge=0)
+
+
+class OpRegRead(BaseModel):
+    id: str
+    status: str
+    submitted_at: str | None = None
+    updated_at: str | None = None
+    nama_lengkap: str | None = None
+    alamat_rumah: str | None = None
+    telepon: str | None = None
+    ktp: str | None = None
+    nama_wp: str
+    alamat_wp: str
+    alamat_op: str
+    kd_propinsi: str
+    kd_dati2: str
+    kd_kecamatan: str
+    kd_kelurahan: str
+    luas_bumi: int
+    luas_bangunan: int
+    subjek_pajak_id: str | None = None
+    nop_assigned: str | None = None
+
+
+class OpRegResponse(BaseResponse):
+    data: OpRegRead

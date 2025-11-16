@@ -15,13 +15,13 @@ class UserInfo(BaseModel):
 
     id: str
     email: EmailStr
-    is_admin: bool
+    role: str
 
 
 class TokenPayload(BaseModel):
     sub: str | None = None
     email: EmailStr | None = None
-    is_admin: bool | None = None
+    role: str | None = None
     exp: int | None = None
     iat: int | None = None
 

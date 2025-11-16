@@ -42,6 +42,18 @@ class Settings(BaseSettings):
     openapi_output_file: str | None = Field(default=None, alias="OPENAPI_OUTPUT_FILE")
     frontend_url: str | None = Field(default=None, alias="FRONTEND_URL")
     backend_url: str | None = Field(default=None, alias="BACKEND_URL")
+    registration_code_length: int = Field(default=7, alias="REGISTRATION_CODE_LENGTH")
+    registration_code_expire_minutes: int = Field(default=10, alias="REGISTRATION_CODE_EXPIRE_MINUTES")
+
+    # Email delivery
+    mail_username: str | None = Field(default=None, alias="MAIL_USERNAME")
+    mail_password: str | None = Field(default=None, alias="MAIL_PASSWORD")
+    mail_from: str = Field(default="no-reply@example.com", alias="MAIL_FROM")
+    mail_port: int = Field(default=587, alias="MAIL_PORT")
+    mail_server: str | None = Field(default=None, alias="MAIL_SERVER")
+    mail_starttls: bool = Field(default=True, alias="MAIL_STARTTLS")
+    mail_ssl_tls: bool = Field(default=False, alias="MAIL_SSL_TLS")
+    mail_use_credentials: bool = Field(default=True, alias="USE_CREDENTIALS")
 
     cors_origins: List[str] = Field(default_factory=lambda: ["*"], alias="CORS_ORIGINS")
     cors_allow_credentials: bool = Field(default=True, alias="CORS_ALLOW_CREDENTIALS")

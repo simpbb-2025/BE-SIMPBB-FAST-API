@@ -3,14 +3,15 @@ from __future__ import annotations
 from math import ceil
 from typing import Dict, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func
 from sqlmodel import and_, or_, select
 
 from app.auth.service import get_current_user
 from app.core.deps import SessionDep
 from app.modules.sppt import schemas
-from app.modules.sppt.models import DatSubjekPajak, Spop, Sppt, User
+from app.modules.sppt.models import DatSubjekPajak, Spop, Sppt, User, OpRegistration
+from uuid import uuid4
 
 router = APIRouter(prefix="/sppt", tags=["op"])
 
@@ -223,6 +224,195 @@ async def list_spop(
         data=data,
         meta=schemas.Meta(pagination=pagination),
     )
+
+
+@router.post("/esppt", response_model=schemas.EspptResponse)
+async def cek_esppt(
+    payload: schemas.EspptRequest,
+    session: SessionDep,
+) -> schemas.EspptResponse:
+    """Public E-SPPT check by NOP + KTP (SUBJEK_PAJAK_ID).
+
+    Returns latest SPPT data along with SPOP and subject info.
+    """
+    fields = parse_nop(payload.nop)
+
+    # Fetch SPOP + subject first to validate KTP linkage
+    result = await _fetch_spop(session, nop_fields=fields)
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Data tidak ditemukan")
+
+    spop, subjek = result
+    ktp_input = (payload.ktp or "").strip()
+    spid = (spop.subjek_pajak_id or "").strip()
+    if not ktp_input or (spid and spid != ktp_input):
+        # Hide existence details to avoid leakage
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Data tidak ditemukan")
+
+    # Latest SPPT for the NOP
+    stmt = (
+        select(Sppt)
+        .where(
+            and_(
+                Sppt.kd_propinsi == fields["kd_propinsi"],
+                Sppt.kd_dati2 == fields["kd_dati2"],
+                Sppt.kd_kecamatan == fields["kd_kecamatan"],
+                Sppt.kd_kelurahan == fields["kd_kelurahan"],
+                Sppt.kd_blok == fields["kd_blok"],
+                Sppt.no_urut == fields["no_urut"],
+                Sppt.kd_jns_op == fields["kd_jns_op"],
+            )
+        )
+        .order_by(Sppt.thn_pajak_sppt.desc())
+        .limit(1)
+    )
+
+    sppt_row = (await session.execute(stmt)).scalar_one_or_none()
+    if sppt_row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="SPPT tidak ditemukan")
+
+    detail = schemas.SpptDetail(
+        year=int(sppt_row.thn_pajak_sppt),
+        nop=compose_nop(fields),
+        luas_bumi=float(sppt_row.luas_bumi_sppt or 0),
+        luas_bangunan=float(sppt_row.luas_bng_sppt or 0),
+        pbb_terhutang=float(sppt_row.pbb_terhutang_sppt or 0),
+        pbb_harus_bayar=float(getattr(sppt_row, "pbb_yg_harus_dibayar_sppt", 0) or 0),
+    )
+
+    data = schemas.EspptData(
+        spop=_spop_to_response(fields, spop),
+        subjek_pajak=_subjek_to_response(subjek) if subjek else None,
+        sppt=detail,
+    )
+
+    return schemas.EspptResponse(message="Data e-SPPT", data=data)
+
+
+@router.post("/op-registration", response_model=schemas.OpRegResponse)
+async def submit_op_registration(
+    payload: schemas.OpRegCreate,
+    session: SessionDep,
+) -> schemas.OpRegResponse:
+    # Create a staging record. This is public; no auth enforced.
+    now_fields = {}
+    record = OpRegistration(
+        id=uuid4().hex,
+        status="submitted",
+        nama_lengkap=payload.nama_lengkap,
+        alamat_rumah=payload.alamat_rumah,
+        telepon=payload.telepon,
+        ktp=payload.ktp,
+        nama_wp=payload.nama_wp,
+        alamat_wp=payload.alamat_wp,
+        alamat_op=payload.alamat_op,
+        kd_propinsi=payload.kd_propinsi,
+        kd_dati2=payload.kd_dati2,
+        kd_kecamatan=payload.kd_kecamatan,
+        kd_kelurahan=payload.kd_kelurahan,
+        luas_bumi=payload.luas_bumi,
+        luas_bangunan=payload.luas_bangunan,
+    )
+    session.add(record)
+    await session.commit()
+    await session.refresh(record)
+
+    data = schemas.OpRegRead.model_validate(record, from_attributes=True)
+    return schemas.OpRegResponse(message="Pengajuan pendaftaran OP diterima", data=data)
+
+
+@router.get("/esppt", response_model=schemas.EspptResponse)
+async def cek_esppt_params(
+    session: SessionDep,
+    nop: Optional[str] = Query(default=None, min_length=18, max_length=25),
+    ktp: Optional[str] = Query(default=None, min_length=8, max_length=30),
+) -> schemas.EspptResponse:
+    """Public E-SPPT check using query params.
+
+    - If both `nop` and `ktp` are provided: ensure they match the same record.
+    - If only `nop` provided: return latest SPPT for that NOP.
+    - If only `ktp` provided: find a NOP by that SUBJEK_PAJAK_ID and return its latest SPPT.
+    """
+    if not nop and not ktp:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Minimal isi salah satu dari 'nop' atau 'ktp'")
+
+    spop: Optional[Spop] = None
+    subjek: Optional[DatSubjekPajak] = None
+    fields: Dict[str, str]
+
+    if nop:
+        fields = parse_nop(nop)
+        res = await _fetch_spop(session, nop_fields=fields)
+        if res is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Data tidak ditemukan")
+        spop, subjek = res
+        if ktp:
+            spid = (spop.subjek_pajak_id or "").strip()
+            if not spid or spid != ktp.strip():
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Data tidak ditemukan")
+    else:
+        # Only KTP provided: pick one SPOP by SUBJEK_PAJAK_ID
+        ktp_norm = ktp.strip()
+        row = (
+            await session.execute(
+                select(Spop, DatSubjekPajak)
+                .select_from(Spop)
+                .join(DatSubjekPajak, Spop.subjek_pajak_id == DatSubjekPajak.subjek_pajak_id, isouter=True)
+                .where(Spop.subjek_pajak_id == ktp_norm)
+                .limit(1)
+            )
+        ).first()
+        if row is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Data tidak ditemukan")
+        spop, subjek = row
+        fields = {
+            "kd_propinsi": spop.kd_propinsi,
+            "kd_dati2": spop.kd_dati2,
+            "kd_kecamatan": spop.kd_kecamatan,
+            "kd_kelurahan": spop.kd_kelurahan,
+            "kd_blok": spop.kd_blok,
+            "no_urut": spop.no_urut,
+            "kd_jns_op": spop.kd_jns_op,
+        }
+
+    # Latest SPPT for the resolved fields
+    stmt = (
+        select(Sppt)
+        .where(
+            and_(
+                Sppt.kd_propinsi == fields["kd_propinsi"],
+                Sppt.kd_dati2 == fields["kd_dati2"],
+                Sppt.kd_kecamatan == fields["kd_kecamatan"],
+                Sppt.kd_kelurahan == fields["kd_kelurahan"],
+                Sppt.kd_blok == fields["kd_blok"],
+                Sppt.no_urut == fields["no_urut"],
+                Sppt.kd_jns_op == fields["kd_jns_op"],
+            )
+        )
+        .order_by(Sppt.thn_pajak_sppt.desc())
+        .limit(1)
+    )
+
+    sppt_row = (await session.execute(stmt)).scalar_one_or_none()
+    if sppt_row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="SPPT tidak ditemukan")
+
+    detail = schemas.SpptDetail(
+        year=int(sppt_row.thn_pajak_sppt),
+        nop=compose_nop(fields),
+        luas_bumi=float(sppt_row.luas_bumi_sppt or 0),
+        luas_bangunan=float(sppt_row.luas_bng_sppt or 0),
+        pbb_terhutang=float(sppt_row.pbb_terhutang_sppt or 0),
+        pbb_harus_bayar=float(getattr(sppt_row, "pbb_yg_harus_dibayar_sppt", 0) or 0),
+    )
+
+    data = schemas.EspptData(
+        spop=_spop_to_response(fields, spop),
+        subjek_pajak=_subjek_to_response(subjek) if subjek else None,
+        sppt=detail,
+    )
+
+    return schemas.EspptResponse(message="Data e-SPPT", data=data)
 
 
 @router.post("/years", response_model=schemas.YearsResponse)

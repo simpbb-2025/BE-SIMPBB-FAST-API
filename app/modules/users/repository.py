@@ -50,7 +50,9 @@ async def create(
     hashed_password: str,
     is_active: bool,
     is_verified: bool,
-    is_admin: bool,
+    role: str,
+    verification_code: str | None = None,
+    verification_code_expires_at: datetime | None = None,
 ) -> User:
     now = datetime.utcnow()
     user = User(
@@ -63,7 +65,9 @@ async def create(
         hashed_password=hashed_password,
         is_active=is_active,
         is_verified=is_verified,
-        is_admin=is_admin,
+        role=role,
+        verification_code=verification_code,
+        verification_code_expires_at=verification_code_expires_at,
         created_at=now,
         updated_at=now,
     )

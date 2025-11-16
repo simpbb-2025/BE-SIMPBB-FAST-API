@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-from typing import Any, Dict, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -86,6 +86,39 @@ class LspopCreatePayload(LspopBasePayload):
         return self
 
 
+class LspopUpdatePayload(BaseModel):
+    kd_jpb: Optional[str] = Field(default=None, min_length=1, max_length=3)
+    no_formulir_lspop: Optional[str] = Field(default=None, max_length=15)
+    thn_dibangun_bng: Optional[str] = Field(default=None, max_length=4)
+    thn_renovasi_bng: Optional[str] = Field(default=None, max_length=4)
+    luas_bng: Optional[Decimal] = None
+    jml_lantai_bng: Optional[int] = None
+    kondisi_bng: Optional[str] = Field(default=None, max_length=2)
+    jns_konstruksi_bng: Optional[str] = Field(default=None, max_length=2)
+    jns_atap_bng: Optional[str] = Field(default=None, max_length=2)
+    kd_dinding: Optional[str] = Field(default=None, max_length=2)
+    kd_lantai: Optional[str] = Field(default=None, max_length=2)
+    kd_langit_langit: Optional[str] = Field(default=None, max_length=2)
+    nilai_sistem_bng: Optional[Decimal] = None
+    jns_transaksi_bng: Optional[str] = Field(default=None, max_length=1)
+    tgl_pendataan_bng: Optional[date] = None
+    nip_pendata_bng: Optional[str] = Field(default=None, max_length=30)
+    tgl_pemeriksaan_bng: Optional[date] = None
+    nip_pemeriksa_bng: Optional[str] = Field(default=None, max_length=30)
+    tgl_perekaman_bng: Optional[date] = None
+    nip_perekam_bng: Optional[str] = Field(default=None, max_length=30)
+    tgl_kunjungan_kembali: Optional[date] = None
+    nilai_individu: Optional[Decimal] = None
+    aktif: Optional[bool] = None
+
+    @model_validator(mode="after")
+    def ensure_changes(self) -> "LspopUpdatePayload":
+        updated = self.model_dump(exclude_unset=True)
+        if not updated:
+            raise ValueError("Tidak ada data yang diperbarui")
+        return self
+
+
 class LspopDetail(BaseModel):
     kd_propinsi: str
     kd_dati2: str
@@ -124,3 +157,76 @@ class LspopCreateResponse(BaseModel):
     success: bool = True
     message: str
     data: LspopDetail
+
+
+class LspopDetailResponse(BaseModel):
+    success: bool = True
+    message: str
+    data: LspopDetail
+
+
+class LspopDeleteResponse(BaseModel):
+    success: bool = True
+    message: str
+
+
+class PaginationLinks(BaseModel):
+    prev: Optional[str]
+    next: Optional[str]
+
+
+class PaginationMeta(BaseModel):
+    total: int
+    limit: int
+    page: int
+    total_pages: int
+    links: PaginationLinks
+
+
+class LspopSearchItem(BaseModel):
+    nop: str
+    no_bng: int
+    kd_jpb: Optional[str]
+    luas_bng: Optional[Decimal]
+    no_formulir_lspop: Optional[str]
+    aktif: bool
+    thn_dibangun_bng: Optional[str]
+    thn_renovasi_bng: Optional[str]
+
+
+class LspopSearchData(BaseModel):
+    items: List[LspopSearchItem]
+    meta: PaginationMeta
+
+
+class LspopSearchResponse(BaseModel):
+    success: bool = True
+    message: str
+    data: LspopSearchData
+
+
+class LspopHistoryEntry(BaseModel):
+    aktivitas: str
+    tanggal: date
+    petugas: Optional[str]
+    nip: Optional[str]
+
+
+class LspopHistoryResponse(BaseModel):
+    success: bool = True
+    message: str
+    items: List[LspopHistoryEntry]
+
+
+class LspopInputHistoryItem(BaseModel):
+    nop: str
+    no_bng: int
+    tanggal: date
+    petugas: Optional[str]
+    nip: Optional[str]
+
+
+class LspopInputHistoryResponse(BaseModel):
+    success: bool = True
+    message: str
+    items: List[LspopInputHistoryItem]

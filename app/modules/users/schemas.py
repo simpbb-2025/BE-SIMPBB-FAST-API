@@ -5,6 +5,13 @@ from math import ceil
 from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from enum import Enum
+
+
+class Role(str, Enum):
+    admin = "admin"
+    staff = "staff"
+    user = "user"
 
 
 class UserBaseInput(BaseModel):
@@ -15,11 +22,25 @@ class UserBaseInput(BaseModel):
     alamat: str = Field(default="")
     is_active: int = Field(default=1, ge=0, le=1)
     is_verified: int = Field(default=0, ge=0, le=1)
-    is_admin: int = Field(default=0, ge=0, le=1)
 
 
 class UserCreate(UserBaseInput):
     password: str = Field(min_length=8)
+    role: Role = Field(default=Role.staff, description="admin atau staff untuk endpoint admin")
+
+
+class RegisterRequest(BaseModel):
+    username: str = Field(min_length=3, max_length=255)
+    email: EmailStr
+    nama: Optional[str] = None
+    telepon: str = Field(default="")
+    alamat: str = Field(default="")
+    password: str = Field(min_length=8)
+
+
+class VerificationCodeVerifyRequest(BaseModel):
+    email: EmailStr
+    verification_code: str = Field(min_length=4, max_length=64)
 
 
 class UserUpdate(BaseModel):
@@ -29,7 +50,7 @@ class UserUpdate(BaseModel):
     password: Optional[str] = Field(default=None, min_length=8)
     is_active: Optional[int] = Field(default=None, ge=0, le=1)
     is_verified: Optional[int] = Field(default=None, ge=0, le=1)
-    is_admin: Optional[int] = Field(default=None, ge=0, le=1)
+    role: Optional[Role] = None
 
 
 class UserRead(BaseModel):
@@ -41,7 +62,7 @@ class UserRead(BaseModel):
     alamat: str
     is_active: bool
     is_verified: bool
-    is_admin: bool
+    role: str
     created_at: datetime
     updated_at: datetime
 

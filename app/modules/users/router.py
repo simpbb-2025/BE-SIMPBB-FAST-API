@@ -17,12 +17,33 @@ async def register_user(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> schemas.UserResponse:
-    if not current_user.is_admin:
+    # Hanya admin boleh membuat user baru (validasi role hanya di endpoint ini)
+    if current_user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")
 
     user = await service.create_user(session, payload)
     data = schemas.UserRead.model_validate(user)
     return schemas.UserResponse(message="User created successfully", data=data)
+
+
+@router.post("/register", response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)
+async def public_register_user(
+    payload: schemas.RegisterRequest,
+    session: AsyncSession = Depends(get_db),
+) -> schemas.UserResponse:
+    user = await service.register_user(session, payload)
+    data = schemas.UserRead.model_validate(user)
+    return schemas.UserResponse(message="Registrasi berhasil, cek email untuk kode verifikasi", data=data)
+
+
+@router.post("/register/request-code", response_model=schemas.UserResponse)
+async def verify_registration_code(
+    payload: schemas.VerificationCodeVerifyRequest,
+    session: AsyncSession = Depends(get_db),
+) -> schemas.UserResponse:
+    user = await service.verify_registration_code(session, payload)
+    data = schemas.UserRead.model_validate(user)
+    return schemas.UserResponse(message="Verifikasi berhasil, akun telah aktif", data=data)
 
 
 @router.get("/profile/me", response_model=schemas.UserResponse)
@@ -37,7 +58,8 @@ async def read_user_by_id(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> schemas.UserResponse:
-    if current_user.id != user_id and not current_user.is_admin:
+    # Tidak ada validasi role; hanya pemilik akun boleh mengakses
+    if current_user.id != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")
 
     user = await service.get_user_by_id(session, user_id)
@@ -55,8 +77,6 @@ async def list_all_users(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> schemas.UsersResponse:
-    if not current_user.is_admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")
 
     offset = (page - 1) * limit
     users, total = await service.list_users(session, offset=offset, limit=limit)
@@ -73,14 +93,21 @@ async def update_user_by_id(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> schemas.UserResponse:
-    if not current_user.is_admin and current_user.id != user_id:
+    # Admin boleh mengupdate siapa saja; selain admin hanya pemilik akun
+    is_admin = getattr(current_user, "role", None) == "admin"
+    if not is_admin and current_user.id != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")
 
     user = await service.get_user_by_id(session, user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    updated = await service.update_user(session, user, payload)
+    updated = await service.update_user(
+        session,
+        user,
+        payload,
+        allow_admin_fields=is_admin,
+    )
     data = schemas.UserRead.model_validate(updated)
     return schemas.UserResponse(message="User updated successfully", data=data)
 
@@ -91,7 +118,12 @@ async def update_current_user(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ) -> schemas.UserResponse:
-    updated = await service.update_user(session, current_user, payload)
+    updated = await service.update_user(
+        session,
+        current_user,
+        payload,
+        allow_admin_fields=False,
+    )
     data = schemas.UserRead.model_validate(updated)
     return schemas.UserResponse(message="Profile updated successfully", data=data)
 
@@ -102,7 +134,9 @@ async def delete_user_by_id(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> schemas.MessageResponse:
-    if not current_user.is_admin:
+    # Admin boleh menghapus siapa saja; selain admin hanya pemilik akun
+    is_admin = getattr(current_user, "role", None) == "admin"
+    if not is_admin and current_user.id != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")
 
     user = await service.get_user_by_id(session, user_id)

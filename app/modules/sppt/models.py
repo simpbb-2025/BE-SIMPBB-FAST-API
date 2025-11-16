@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Optional
 
-from sqlalchemy import Column, Numeric, String
+from sqlalchemy import Column, Numeric, String, DateTime, Enum
+from datetime import datetime
 from sqlmodel import Field, SQLModel
 
 from app.modules.dashboards.models import Sppt  # Reuse existing SPPT model
@@ -52,9 +53,62 @@ class DatSubjekPajak(SQLModel, table=True):
 
 User = UsersUser
 
+
+class OpRegistration(SQLModel, table=True):
+    __tablename__ = "op_registration"
+
+    id: str = Field(sa_column=Column("id", String(32), primary_key=True))
+    submitted_at: Optional[datetime] = Field(
+        default=None, sa_column=Column("submitted_at", DateTime, nullable=False)
+    )
+    updated_at: Optional[datetime] = Field(
+        default=None, sa_column=Column("updated_at", DateTime, nullable=False)
+    )
+    status: Optional[str] = Field(
+        default="submitted",
+        sa_column=Column(
+            "status",
+            String(16),
+            nullable=False,
+        ),
+    )
+    notes: Optional[str] = Field(default=None, sa_column=Column("notes", String(2000)))
+
+    submitted_by_user_id: Optional[str] = Field(
+        default=None, sa_column=Column("submitted_by_user_id", String(32))
+    )
+    assigned_staff_id: Optional[str] = Field(
+        default=None, sa_column=Column("assigned_staff_id", String(32))
+    )
+    processed_at: Optional[datetime] = Field(
+        default=None, sa_column=Column("processed_at", DateTime)
+    )
+
+    # Data Pemohon
+    nama_lengkap: Optional[str] = Field(default=None, sa_column=Column("nama_lengkap", String(255)))
+    alamat_rumah: Optional[str] = Field(default=None, sa_column=Column("alamat_rumah", String(255)))
+    telepon: Optional[str] = Field(default=None, sa_column=Column("telepon", String(50)))
+    ktp: Optional[str] = Field(default=None, sa_column=Column("ktp", String(30)))
+
+    # Data WP/OP
+    nama_wp: str = Field(sa_column=Column("nama_wp", String(255), nullable=False))
+    alamat_wp: str = Field(sa_column=Column("alamat_wp", String(255), nullable=False))
+    alamat_op: str = Field(sa_column=Column("alamat_op", String(255), nullable=False))
+    kd_propinsi: str = Field(sa_column=Column("kd_propinsi", String(2), nullable=False))
+    kd_dati2: str = Field(sa_column=Column("kd_dati2", String(2), nullable=False))
+    kd_kecamatan: str = Field(sa_column=Column("kd_kecamatan", String(3), nullable=False))
+    kd_kelurahan: str = Field(sa_column=Column("kd_kelurahan", String(3), nullable=False))
+    luas_bumi: int = Field(sa_column=Column("luas_bumi", Numeric(18, 0), nullable=False))
+    luas_bangunan: int = Field(sa_column=Column("luas_bangunan", Numeric(18, 0), nullable=False))
+
+    # Hasil proses
+    subjek_pajak_id: Optional[str] = Field(default=None, sa_column=Column("subjek_pajak_id", String(30)))
+    nop_assigned: Optional[str] = Field(default=None, sa_column=Column("nop_assigned", String(18)))
+
 __all__ = [
     "Spop",
     "DatSubjekPajak",
     "Sppt",
+    "OpRegistration",
     "User",
 ]
