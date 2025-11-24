@@ -82,6 +82,7 @@ class SpopRegistration(Base):
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
 
     # Bagian Paling Awal
+    no_formulir: Mapped[Optional[str]] = mapped_column(String(20))
     nama_awal: Mapped[str] = mapped_column(String(255), nullable=False)
     nik_awal: Mapped[str] = mapped_column(String(50), nullable=False)
     alamat_rumah_awal: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -125,6 +126,14 @@ class SpopRegistration(Base):
     file_foto_objek: Mapped[str] = mapped_column(String(255), nullable=False)
     file_surat_kuasa: Mapped[Optional[str]] = mapped_column(String(255))
     file_pendukung: Mapped[Optional[str]] = mapped_column(String(255))
+
+    # Petugas (diisi melalui endpoint staff)
+    nama_petugas: Mapped[Optional[str]] = mapped_column(String(255))
+    nip: Mapped[Optional[str]] = mapped_column(String(50))
+
+    # Status & keterangan
+    status: Mapped[Optional[str]] = mapped_column(String(50))
+    keterangan: Mapped[Optional[str]] = mapped_column(String(255))
 
     # Timestamp
     submitted_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())

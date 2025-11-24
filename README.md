@@ -112,12 +112,12 @@ Semua endpoint di bawah membutuhkan bearer token kecuali `POST /auth/login`.
 - `POST /spop/requests` - buat permohonan objek pajak baru ke tabel `spop_registration` (menerima JSON atau form-data).
 - `GET /spop/requests` - daftar permohonan (pagination `page`, `limit`).
 - `GET /spop/requests/{request_id}` - detail permohonan.
-- `PATCH /spop/requests/{request_id}` - perbarui sebagian field permohonan (JSON atau form-data).
+- `PUT /spop/requests/{request_id}` - perbarui permohonan (menerima JSON atau form-data; juga tersedia `PATCH` dan alias `POST` untuk klien yang tidak mendukung PUT/PATCH).
 - `DELETE /spop/requests/{request_id}` - hapus permohonan.
 - `POST /lsop` - buat lampiran SPOP (`lampiran_spop`) untuk bangunan (JSON atau form-data).
 - `GET /lsop` - daftar lampiran (pagination `page`, `limit`, filter `nop`).
 - `GET /lsop/{id}` - detail lampiran.
-- `PATCH /lsop/{id}` - perbarui lampiran (parsial).
+- `PUT /lsop/{id}` - perbarui lampiran (JSON atau form-data; juga tersedia `PATCH` dan alias `POST` untuk klien yang tidak mendukung PUT/PATCH).
 - `DELETE /lsop/{id}` - hapus lampiran.
 
 Contoh payload `POST /spop/requests`:

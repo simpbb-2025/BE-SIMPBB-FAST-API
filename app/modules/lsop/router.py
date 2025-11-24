@@ -85,6 +85,8 @@ async def _load_payload(request: Request, model_cls):
     except Exception:
         form = await request.form()
         data = dict(form)
+    for key in ("_method", "_put", "_patch"):
+        data.pop(key, None)
     return model_cls(**data)
 
 
@@ -157,6 +159,8 @@ async def get_lsop(
 
 
 @router.patch("/{lampiran_id}", response_model=schemas.LampiranResponse)
+@router.put("/{lampiran_id}", response_model=schemas.LampiranResponse, include_in_schema=False)
+@router.post("/{lampiran_id}", response_model=schemas.LampiranResponse, include_in_schema=False)
 async def update_lsop(
     lampiran_id: str,
     request: Request,

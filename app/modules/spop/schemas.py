@@ -261,12 +261,15 @@ class RequestCreatePayload(BaseModel):
     file_foto_objek: str
     file_surat_kuasa: Optional[str] = None
     file_pendukung: Optional[str] = None
+    status: Optional[str] = None
+    keterangan: Optional[str] = None
 
 
 class RequestRecord(BaseModel):
     id: str
     submitted_at: datetime
 
+    no_formulir: Optional[str]
     nama_awal: str
     nik_awal: str
     alamat_rumah_awal: str
@@ -305,6 +308,10 @@ class RequestRecord(BaseModel):
     file_foto_objek: str
     file_surat_kuasa: Optional[str] = None
     file_pendukung: Optional[str] = None
+    nama_petugas: Optional[str] = None
+    nip: Optional[str] = None
+    status: Optional[str] = None
+    keterangan: Optional[str] = None
 
 
 class RequestResponse(BaseModel):
@@ -368,6 +375,8 @@ class RequestUpdatePayload(BaseModel):
     file_foto_objek: Optional[str] = Field(default=None, max_length=255)
     file_surat_kuasa: Optional[str] = Field(default=None, max_length=255)
     file_pendukung: Optional[str] = Field(default=None, max_length=255)
+    status: Optional[str] = Field(default=None, max_length=50)
+    keterangan: Optional[str] = Field(default=None, max_length=255)
 
     @model_validator(mode="after")
     def ensure_changes(self) -> "RequestUpdatePayload":
@@ -380,3 +389,15 @@ class RequestUpdatePayload(BaseModel):
 class RequestDeleteResponse(BaseModel):
     success: bool = True
     message: str
+
+
+class StaffUpdatePayload(BaseModel):
+    nama_petugas: Optional[str] = Field(default=None, max_length=255)
+    nip: Optional[str] = Field(default=None, max_length=50)
+
+    @model_validator(mode="after")
+    def ensure_changes(self) -> "StaffUpdatePayload":
+        data = self.model_dump(exclude_unset=True, exclude_none=True)
+        if not data:
+            raise ValueError("Tidak ada data yang diperbarui")
+        return self

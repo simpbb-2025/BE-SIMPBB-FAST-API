@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from secrets import randbelow
+from datetime import datetime
 from typing import Dict, Iterable, List, Optional, Tuple
 from uuid import uuid4
 
@@ -132,6 +133,7 @@ def _registration_to_record(registration: SpopRegistration) -> schemas.RequestRe
     return schemas.RequestRecord(
         id=registration.id,
         submitted_at=registration.submitted_at,
+        no_formulir=registration.no_formulir,
         nama_awal=registration.nama_awal,
         nik_awal=registration.nik_awal,
         alamat_rumah_awal=registration.alamat_rumah_awal,
@@ -165,27 +167,35 @@ def _registration_to_record(registration: SpopRegistration) -> schemas.RequestRe
         file_foto_objek=registration.file_foto_objek,
         file_surat_kuasa=registration.file_surat_kuasa,
         file_pendukung=registration.file_pendukung,
+        nama_petugas=registration.nama_petugas,
+        nip=registration.nip,
+        status=registration.status,
+        keterangan=registration.keterangan,
     )
 
 
-@router.post("/requests", response_model=schemas.RequestResponse, status_code=status.HTTP_201_CREATED)
 async def _load_payload(request: Request, model_cls):
     try:
         data = await request.json()
     except Exception:
         form = await request.form()
         data = dict(form)
+    for key in ("_method", "_put", "_patch"):
+        data.pop(key, None)
     return model_cls(**data)
 
 
+@router.post("/requests", response_model=schemas.RequestResponse, status_code=status.HTTP_201_CREATED)
 async def create_registration_request(
     request: Request,
     session: SessionDep,
     current_user: CurrentUserDep,
 ) -> schemas.RequestResponse:
     payload = await _load_payload(request, schemas.RequestCreatePayload)
+    form_number = datetime.now().strftime("%Y.%m.%d.%H.%M")
     registration = SpopRegistration(
         id=uuid4().hex,
+        no_formulir=form_number,
         nama_awal=payload.nama_awal.strip(),
         nik_awal=payload.nik_awal.strip(),
         alamat_rumah_awal=payload.alamat_rumah_awal.strip(),
@@ -219,6 +229,10 @@ async def create_registration_request(
         file_foto_objek=payload.file_foto_objek.strip(),
         file_surat_kuasa=payload.file_surat_kuasa.strip() if payload.file_surat_kuasa else None,
         file_pendukung=payload.file_pendukung.strip() if payload.file_pendukung else None,
+        status=payload.status.strip() if payload.status else None,
+        keterangan=payload.keterangan.strip() if payload.keterangan else None,
+        nama_petugas=None,
+        nip=None,
     )
 
     session.add(registration)
@@ -275,6 +289,8 @@ async def get_registration_request(
 
 
 @router.patch("/requests/{request_id}", response_model=schemas.RequestResponse)
+@router.put("/requests/{request_id}", response_model=schemas.RequestResponse, include_in_schema=False)
+@router.post("/requests/{request_id}", response_model=schemas.RequestResponse, include_in_schema=False)
 async def update_registration_request(
     request_id: str,
     request: Request,
@@ -296,6 +312,32 @@ async def update_registration_request(
     await session.refresh(registration)
     record = _registration_to_record(registration)
     return schemas.RequestResponse(message="Permohonan berhasil diperbarui", data=record)
+
+
+@router.patch("/requests/staff/{request_id}", response_model=schemas.RequestResponse)
+@router.put("/requests/staff/{request_id}", response_model=schemas.RequestResponse, include_in_schema=False)
+@router.post("/requests/staff/{request_id}", response_model=schemas.RequestResponse, include_in_schema=False)
+async def update_registration_staff_fields(
+    request_id: str,
+    request: Request,
+    session: SessionDep,
+    current_user: CurrentUserDep,
+) -> schemas.RequestResponse:
+    registration = await session.get(SpopRegistration, request_id)
+    if registration is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Permohonan tidak ditemukan")
+
+    payload = await _load_payload(request, schemas.StaffUpdatePayload)
+    updates = payload.model_dump(exclude_unset=True, exclude_none=True)
+    for key, value in updates.items():
+        if isinstance(value, str):
+            value = value.strip()
+        setattr(registration, key, value)
+
+    await session.commit()
+    await session.refresh(registration)
+    record = _registration_to_record(registration)
+    return schemas.RequestResponse(message="Data petugas berhasil diperbarui", data=record)
 
 
 @router.delete("/requests/{request_id}", response_model=schemas.RequestDeleteResponse)
