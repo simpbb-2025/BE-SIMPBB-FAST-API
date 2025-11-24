@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import BigInteger, Date, String
+from sqlalchemy import BigInteger, Date, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
 from app.modules.dashboards.models import RefDati2, RefKecamatan, RefKelurahan, RefPropinsi
+from sqlalchemy import func
 
 
 class Spop(Base):
@@ -75,9 +76,64 @@ class DatSubjekPajak(Base):
     email_wp: Mapped[Optional[str]] = mapped_column("EMAIL_WP", String(150))
 
 
+class SpopRegistration(Base):
+    __tablename__ = "spop_registration"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+
+    # Bagian Paling Awal
+    nama_awal: Mapped[str] = mapped_column(String(255), nullable=False)
+    nik_awal: Mapped[str] = mapped_column(String(50), nullable=False)
+    alamat_rumah_awal: Mapped[str] = mapped_column(String(255), nullable=False)
+    no_telp_awal: Mapped[str] = mapped_column(String(30), nullable=False)
+
+    # Data Letak Objek Pajak
+    provinsi_op: Mapped[str] = mapped_column(String(100), nullable=False)
+    kabupaten_op: Mapped[str] = mapped_column(String(100), nullable=False)
+    kecamatan_op: Mapped[str] = mapped_column(String(100), nullable=False)
+    kelurahan_op: Mapped[str] = mapped_column(String(100), nullable=False)
+    blok_op: Mapped[str] = mapped_column(String(50), nullable=False)
+    no_urut_op: Mapped[str] = mapped_column(String(50), nullable=False)
+
+    # Data Subjek Pajak
+    nama_lengkap: Mapped[str] = mapped_column(String(255), nullable=False)
+    nik: Mapped[str] = mapped_column(String(50), nullable=False)
+    status_subjek: Mapped[str] = mapped_column(String(100), nullable=False)
+    pekerjaan_subjek: Mapped[str] = mapped_column(String(100), nullable=False)
+    npwp: Mapped[Optional[str]] = mapped_column(String(50))
+    no_telp_subjek: Mapped[str] = mapped_column(String(30), nullable=False)
+
+    # Alamat Subjek Pajak
+    jalan_subjek: Mapped[str] = mapped_column(String(255), nullable=False)
+    blok_kav_no_subjek: Mapped[str] = mapped_column(String(100), nullable=False)
+    kelurahan_subjek: Mapped[str] = mapped_column(String(100), nullable=False)
+    kecamatan_subjek: Mapped[str] = mapped_column(String(100), nullable=False)
+    kabupaten_subjek: Mapped[str] = mapped_column(String(100), nullable=False)
+    provinsi_subjek: Mapped[str] = mapped_column(String(100), nullable=False)
+    rt_subjek: Mapped[str] = mapped_column(String(10), nullable=False)
+    rw_subjek: Mapped[str] = mapped_column(String(10), nullable=False)
+    kode_pos_subjek: Mapped[str] = mapped_column(String(20), nullable=False)
+
+    # Data Objek Pajak
+    jenis_tanah: Mapped[str] = mapped_column(String(100), nullable=False)
+    luas_tanah: Mapped[int] = mapped_column(BigInteger, nullable=False)
+
+    # Upload Berkas
+    file_ktp: Mapped[str] = mapped_column(String(255), nullable=False)
+    file_sertifikat: Mapped[str] = mapped_column(String(255), nullable=False)
+    file_sppt_tetangga: Mapped[str] = mapped_column(String(255), nullable=False)
+    file_foto_objek: Mapped[str] = mapped_column(String(255), nullable=False)
+    file_surat_kuasa: Mapped[Optional[str]] = mapped_column(String(255))
+    file_pendukung: Mapped[Optional[str]] = mapped_column(String(255))
+
+    # Timestamp
+    submitted_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+
+
 __all__ = [
     "Spop",
     "DatSubjekPajak",
+    "SpopRegistration",
     "RefPropinsi",
     "RefDati2",
     "RefKecamatan",

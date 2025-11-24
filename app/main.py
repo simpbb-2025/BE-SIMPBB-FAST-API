@@ -13,6 +13,7 @@ from app.core.database import Base, engine
 # Import models so that SQLAlchemy registers them with the shared metadata.
 from app.modules.users import models as users_models  # noqa: F401
 from app.modules.spop import models as spop_models  # noqa: F401
+from app.modules.lsop import models as lsop_models  # noqa: F401
 
 app = FastAPI(title="SIMPBB API", version="0.1.0")
 

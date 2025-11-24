@@ -220,3 +220,163 @@ class RiwayatResponse(BaseModel):
     success: bool = True
     message: str
     items: List[RiwayatEntry]
+
+
+class RequestCreatePayload(BaseModel):
+    nama_awal: str
+    nik_awal: str = Field(max_length=50)
+    alamat_rumah_awal: str
+    no_telp_awal: str = Field(max_length=30)
+
+    provinsi_op: str
+    kabupaten_op: str
+    kecamatan_op: str
+    kelurahan_op: str
+    blok_op: str
+    no_urut_op: str
+
+    nama_lengkap: str
+    nik: str = Field(max_length=50)
+    status_subjek: str
+    pekerjaan_subjek: str
+    npwp: Optional[str] = Field(default=None, max_length=50)
+    no_telp_subjek: str = Field(max_length=30)
+
+    jalan_subjek: str
+    blok_kav_no_subjek: str
+    kelurahan_subjek: str
+    kecamatan_subjek: str
+    kabupaten_subjek: str
+    provinsi_subjek: str
+    rt_subjek: str
+    rw_subjek: str
+    kode_pos_subjek: str
+
+    jenis_tanah: str
+    luas_tanah: int
+
+    file_ktp: str
+    file_sertifikat: str
+    file_sppt_tetangga: str
+    file_foto_objek: str
+    file_surat_kuasa: Optional[str] = None
+    file_pendukung: Optional[str] = None
+
+
+class RequestRecord(BaseModel):
+    id: str
+    submitted_at: datetime
+
+    nama_awal: str
+    nik_awal: str
+    alamat_rumah_awal: str
+    no_telp_awal: str
+
+    provinsi_op: str
+    kabupaten_op: str
+    kecamatan_op: str
+    kelurahan_op: str
+    blok_op: str
+    no_urut_op: str
+
+    nama_lengkap: str
+    nik: str
+    status_subjek: str
+    pekerjaan_subjek: str
+    npwp: Optional[str]
+    no_telp_subjek: str
+
+    jalan_subjek: str
+    blok_kav_no_subjek: str
+    kelurahan_subjek: str
+    kecamatan_subjek: str
+    kabupaten_subjek: str
+    provinsi_subjek: str
+    rt_subjek: str
+    rw_subjek: str
+    kode_pos_subjek: str
+
+    jenis_tanah: str
+    luas_tanah: int
+
+    file_ktp: str
+    file_sertifikat: str
+    file_sppt_tetangga: str
+    file_foto_objek: str
+    file_surat_kuasa: Optional[str] = None
+    file_pendukung: Optional[str] = None
+
+
+class RequestResponse(BaseModel):
+    success: bool = True
+    message: str
+    data: RequestRecord
+
+
+class RequestPagination(BaseModel):
+    total: int
+    page: int
+    limit: int
+    pages: int
+    has_next: bool
+    has_prev: bool
+
+
+class RequestListResponse(BaseModel):
+    success: bool = True
+    message: str
+    data: List[RequestRecord]
+    meta: RequestPagination
+
+
+class RequestUpdatePayload(BaseModel):
+    nama_awal: Optional[str] = Field(default=None, max_length=255)
+    nik_awal: Optional[str] = Field(default=None, max_length=50)
+    alamat_rumah_awal: Optional[str] = Field(default=None, max_length=255)
+    no_telp_awal: Optional[str] = Field(default=None, max_length=30)
+
+    provinsi_op: Optional[str] = Field(default=None, max_length=100)
+    kabupaten_op: Optional[str] = Field(default=None, max_length=100)
+    kecamatan_op: Optional[str] = Field(default=None, max_length=100)
+    kelurahan_op: Optional[str] = Field(default=None, max_length=100)
+    blok_op: Optional[str] = Field(default=None, max_length=50)
+    no_urut_op: Optional[str] = Field(default=None, max_length=50)
+
+    nama_lengkap: Optional[str] = Field(default=None, max_length=255)
+    nik: Optional[str] = Field(default=None, max_length=50)
+    status_subjek: Optional[str] = Field(default=None, max_length=100)
+    pekerjaan_subjek: Optional[str] = Field(default=None, max_length=100)
+    npwp: Optional[str] = Field(default=None, max_length=50)
+    no_telp_subjek: Optional[str] = Field(default=None, max_length=30)
+
+    jalan_subjek: Optional[str] = Field(default=None, max_length=255)
+    blok_kav_no_subjek: Optional[str] = Field(default=None, max_length=100)
+    kelurahan_subjek: Optional[str] = Field(default=None, max_length=100)
+    kecamatan_subjek: Optional[str] = Field(default=None, max_length=100)
+    kabupaten_subjek: Optional[str] = Field(default=None, max_length=100)
+    provinsi_subjek: Optional[str] = Field(default=None, max_length=100)
+    rt_subjek: Optional[str] = Field(default=None, max_length=10)
+    rw_subjek: Optional[str] = Field(default=None, max_length=10)
+    kode_pos_subjek: Optional[str] = Field(default=None, max_length=20)
+
+    jenis_tanah: Optional[str] = Field(default=None, max_length=100)
+    luas_tanah: Optional[int] = None
+
+    file_ktp: Optional[str] = Field(default=None, max_length=255)
+    file_sertifikat: Optional[str] = Field(default=None, max_length=255)
+    file_sppt_tetangga: Optional[str] = Field(default=None, max_length=255)
+    file_foto_objek: Optional[str] = Field(default=None, max_length=255)
+    file_surat_kuasa: Optional[str] = Field(default=None, max_length=255)
+    file_pendukung: Optional[str] = Field(default=None, max_length=255)
+
+    @model_validator(mode="after")
+    def ensure_changes(self) -> "RequestUpdatePayload":
+        data = self.model_dump(exclude_unset=True, exclude_none=True)
+        if not data:
+            raise ValueError("Tidak ada data yang diperbarui")
+        return self
+
+
+class RequestDeleteResponse(BaseModel):
+    success: bool = True
+    message: str

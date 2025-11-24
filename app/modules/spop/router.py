@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from datetime import date
 from secrets import randbelow
 from typing import Dict, Iterable, List, Optional, Tuple
+from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from sqlalchemy import and_, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
@@ -18,6 +18,7 @@ from app.modules.spop.models import (
     RefKelurahan,
     RefPropinsi,
     Spop,
+    SpopRegistration,
 )
 
 router = APIRouter(prefix="/spop", tags=["spop"])
@@ -125,6 +126,190 @@ async def _ensure_subjek_exists(session: SessionDep, subjek_pajak_id: str) -> No
     result = await session.execute(stmt)
     if result.scalar_one_or_none() is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Subjek pajak tidak ditemukan")
+
+
+def _registration_to_record(registration: SpopRegistration) -> schemas.RequestRecord:
+    return schemas.RequestRecord(
+        id=registration.id,
+        submitted_at=registration.submitted_at,
+        nama_awal=registration.nama_awal,
+        nik_awal=registration.nik_awal,
+        alamat_rumah_awal=registration.alamat_rumah_awal,
+        no_telp_awal=registration.no_telp_awal,
+        provinsi_op=registration.provinsi_op,
+        kabupaten_op=registration.kabupaten_op,
+        kecamatan_op=registration.kecamatan_op,
+        kelurahan_op=registration.kelurahan_op,
+        blok_op=registration.blok_op,
+        no_urut_op=registration.no_urut_op,
+        nama_lengkap=registration.nama_lengkap,
+        nik=registration.nik,
+        status_subjek=registration.status_subjek,
+        pekerjaan_subjek=registration.pekerjaan_subjek,
+        npwp=registration.npwp,
+        no_telp_subjek=registration.no_telp_subjek,
+        jalan_subjek=registration.jalan_subjek,
+        blok_kav_no_subjek=registration.blok_kav_no_subjek,
+        kelurahan_subjek=registration.kelurahan_subjek,
+        kecamatan_subjek=registration.kecamatan_subjek,
+        kabupaten_subjek=registration.kabupaten_subjek,
+        provinsi_subjek=registration.provinsi_subjek,
+        rt_subjek=registration.rt_subjek,
+        rw_subjek=registration.rw_subjek,
+        kode_pos_subjek=registration.kode_pos_subjek,
+        jenis_tanah=registration.jenis_tanah,
+        luas_tanah=registration.luas_tanah,
+        file_ktp=registration.file_ktp,
+        file_sertifikat=registration.file_sertifikat,
+        file_sppt_tetangga=registration.file_sppt_tetangga,
+        file_foto_objek=registration.file_foto_objek,
+        file_surat_kuasa=registration.file_surat_kuasa,
+        file_pendukung=registration.file_pendukung,
+    )
+
+
+@router.post("/requests", response_model=schemas.RequestResponse, status_code=status.HTTP_201_CREATED)
+async def _load_payload(request: Request, model_cls):
+    try:
+        data = await request.json()
+    except Exception:
+        form = await request.form()
+        data = dict(form)
+    return model_cls(**data)
+
+
+async def create_registration_request(
+    request: Request,
+    session: SessionDep,
+    current_user: CurrentUserDep,
+) -> schemas.RequestResponse:
+    payload = await _load_payload(request, schemas.RequestCreatePayload)
+    registration = SpopRegistration(
+        id=uuid4().hex,
+        nama_awal=payload.nama_awal.strip(),
+        nik_awal=payload.nik_awal.strip(),
+        alamat_rumah_awal=payload.alamat_rumah_awal.strip(),
+        no_telp_awal=payload.no_telp_awal.strip(),
+        provinsi_op=payload.provinsi_op.strip(),
+        kabupaten_op=payload.kabupaten_op.strip(),
+        kecamatan_op=payload.kecamatan_op.strip(),
+        kelurahan_op=payload.kelurahan_op.strip(),
+        blok_op=payload.blok_op.strip(),
+        no_urut_op=payload.no_urut_op.strip(),
+        nama_lengkap=payload.nama_lengkap.strip(),
+        nik=payload.nik.strip(),
+        status_subjek=payload.status_subjek.strip(),
+        pekerjaan_subjek=payload.pekerjaan_subjek.strip(),
+        npwp=payload.npwp.strip() if payload.npwp else None,
+        no_telp_subjek=payload.no_telp_subjek.strip(),
+        jalan_subjek=payload.jalan_subjek.strip(),
+        blok_kav_no_subjek=payload.blok_kav_no_subjek.strip(),
+        kelurahan_subjek=payload.kelurahan_subjek.strip(),
+        kecamatan_subjek=payload.kecamatan_subjek.strip(),
+        kabupaten_subjek=payload.kabupaten_subjek.strip(),
+        provinsi_subjek=payload.provinsi_subjek.strip(),
+        rt_subjek=payload.rt_subjek.strip(),
+        rw_subjek=payload.rw_subjek.strip(),
+        kode_pos_subjek=payload.kode_pos_subjek.strip(),
+        jenis_tanah=payload.jenis_tanah.strip(),
+        luas_tanah=payload.luas_tanah,
+        file_ktp=payload.file_ktp.strip(),
+        file_sertifikat=payload.file_sertifikat.strip(),
+        file_sppt_tetangga=payload.file_sppt_tetangga.strip(),
+        file_foto_objek=payload.file_foto_objek.strip(),
+        file_surat_kuasa=payload.file_surat_kuasa.strip() if payload.file_surat_kuasa else None,
+        file_pendukung=payload.file_pendukung.strip() if payload.file_pendukung else None,
+    )
+
+    session.add(registration)
+
+    await session.commit()
+
+    await session.refresh(registration)
+    record = _registration_to_record(registration)
+    return schemas.RequestResponse(message="Permohonan berhasil dibuat", data=record)
+
+
+@router.get("/requests", response_model=schemas.RequestListResponse)
+async def list_registration_requests(
+    session: SessionDep,
+    current_user: CurrentUserDep,
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+) -> schemas.RequestListResponse:
+    stmt = select(SpopRegistration).order_by(SpopRegistration.submitted_at.desc())
+    count_stmt = select(func.count()).select_from(SpopRegistration)
+
+    total = (await session.execute(count_stmt)).scalar_one()
+    offset = (page - 1) * limit
+    result = await session.execute(stmt.offset(offset).limit(limit))
+    rows = result.scalars().all()
+
+    data: List[schemas.RequestRecord] = []
+    for row in rows:
+        data.append(_registration_to_record(row))
+
+    pages = (total + limit - 1) // limit if total else 0
+    meta = schemas.RequestPagination(
+        total=total,
+        page=page,
+        limit=limit,
+        pages=pages,
+        has_next=page < pages if pages else False,
+        has_prev=page > 1,
+    )
+    return schemas.RequestListResponse(message="Daftar permohonan berhasil diambil", data=data, meta=meta)
+
+
+@router.get("/requests/{request_id}", response_model=schemas.RequestResponse)
+async def get_registration_request(
+    request_id: str,
+    session: SessionDep,
+    current_user: CurrentUserDep,
+) -> schemas.RequestResponse:
+    registration = await session.get(SpopRegistration, request_id)
+    if registration is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Permohonan tidak ditemukan")
+    record = _registration_to_record(registration)
+    return schemas.RequestResponse(message="Detail permohonan berhasil diambil", data=record)
+
+
+@router.patch("/requests/{request_id}", response_model=schemas.RequestResponse)
+async def update_registration_request(
+    request_id: str,
+    request: Request,
+    session: SessionDep,
+    current_user: CurrentUserDep,
+) -> schemas.RequestResponse:
+    payload = await _load_payload(request, schemas.RequestUpdatePayload)
+    registration = await session.get(SpopRegistration, request_id)
+    if registration is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Permohonan tidak ditemukan")
+
+    updates = payload.model_dump(exclude_unset=True, exclude_none=True)
+    for key, value in updates.items():
+        if isinstance(value, str):
+            value = value.strip()
+        setattr(registration, key, value)
+
+    await session.commit()
+    await session.refresh(registration)
+    record = _registration_to_record(registration)
+    return schemas.RequestResponse(message="Permohonan berhasil diperbarui", data=record)
+
+
+@router.delete("/requests/{request_id}", response_model=schemas.RequestDeleteResponse)
+async def delete_registration_request(
+    request_id: str,
+    session: SessionDep,
+    current_user: CurrentUserDep,
+) -> schemas.RequestDeleteResponse:
+    registration = await session.get(SpopRegistration, request_id)
+    if registration is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Permohonan tidak ditemukan")
+    await session.delete(registration)
+    await session.commit()
+    return schemas.RequestDeleteResponse(message="Permohonan berhasil dihapus")
 
 
 async def _fetch_spop_detail(
