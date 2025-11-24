@@ -27,13 +27,10 @@ ALTER TABLE ipbb_user
 
 Untuk alur permohonan objek pajak baru, pastikan tabel tambahan berikut tersedia di database:
 
-- `requests`
-- `taxpayer_subjects`
-- `taxpayer_addresses`
-- `property_objects`
-- `request_files`
+- `spop_registration`
+- `lampiran_spop`
 
-Struktur tabel mengikuti definisi yang diberikan pada berkas migrasi pengguna (masing-masing memiliki `request_id` yang mereferensikan tabel utama `requests`).
+Struktur tabel mengikuti definisi pada README ini (lihat contoh payload SPOP dan LSOP).
 
 ## Running the server
 
@@ -107,49 +104,88 @@ Semua endpoint di bawah membutuhkan bearer token kecuali `POST /auth/login`.
 - `GET /dashboard/sppt/filters` – opsi filter wilayah dan daftar tahun SPPT.
 - `GET /dashboard/sppt-report/filters` – filter laporan SPPT (15 tahun terakhir, daftar kecamatan, default tahun maksimum).
 - `GET /dashboard/sppt-report/data` – data laporan SPPT (table + statistik + yearly chart) dengan filter tahun, kecamatan, dan pagination (`page`, `limit`).
-- `POST /sppt/verifikasi` – verifikasi data SPOP dan Subjek Pajak berdasarkan NOP dan (opsional) Subjek Pajak ID.
-- `GET /sppt/spop` – daftar objek pajak dengan pagination, pencarian, dan sorting.
+- `POST /sppt/verifikasi` - verifikasi data SPOP dan Subjek Pajak berdasarkan NOP dan (opsional) Subjek Pajak ID.
+- `GET /sppt/spop` - daftar objek pajak dengan pagination, pencarian, dan sorting.
 - `POST /sppt/years` - daftar tahun SPPT untuk NOP tertentu.
 - `GET /sppt/{year}/{nop}` - detail SPPT berdasarkan tahun dan NOP.
 - `GET /sppt/batch/{nop}` - semua SPPT untuk satu NOP.
-- `POST /spop/requests` - buat permohonan objek pajak baru beserta data subjek, alamat, objek, dan berkas.
-- `GET /spop/requests` - daftar permohonan (filter `status`, pagination `page`, `limit`).
-- `GET /spop/requests/{request_id}` - detail lengkap permohonan.
-- `PATCH /spop/requests/{request_id}/status` - ubah status permohonan (`submitted`, `verified`, `approved`, `rejected`).
+- `POST /spop/requests` - buat permohonan objek pajak baru ke tabel `spop_registration` (menerima JSON atau form-data).
+- `GET /spop/requests` - daftar permohonan (pagination `page`, `limit`).
+- `GET /spop/requests/{request_id}` - detail permohonan.
+- `PATCH /spop/requests/{request_id}` - perbarui sebagian field permohonan (JSON atau form-data).
+- `DELETE /spop/requests/{request_id}` - hapus permohonan.
+- `POST /lsop` - buat lampiran SPOP (`lampiran_spop`) untuk bangunan (JSON atau form-data).
+- `GET /lsop` - daftar lampiran (pagination `page`, `limit`, filter `nop`).
+- `GET /lsop/{id}` - detail lampiran.
+- `PATCH /lsop/{id}` - perbarui lampiran (parsial).
+- `DELETE /lsop/{id}` - hapus lampiran.
 
 Contoh payload `POST /spop/requests`:
 
 ```json
 {
-  "subject_full_name": "Budi Santoso",
-  "subject_nik": "1234567890123456",
-  "subject_tax_status": "WNI",
-  "subject_occupation": "Karyawan Swasta",
-  "subject_npwp": "12.345.678.9-012.345",
-  "subject_phone_number": "081234567890",
-  "address_street": "Jl. Melati No. 10",
-  "address_block_number": "Blok B5",
-  "address_village": "Caturtunggal",
-  "address_district": "Depok",
-  "address_city": "Sleman",
-  "address_province": "DI Yogyakarta",
-  "address_rt": "005",
-  "address_rw": "003",
-  "address_postal_code": "55281",
-  "property_province": "DI Yogyakarta",
-  "property_city": "Sleman",
-  "property_district": "Depok",
-  "property_village": "Caturtunggal",
-  "property_block": "001",
-  "property_sequence_number": "0123",
-  "property_land_type": "Perumahan",
-  "property_land_area": 150,
-  "taxpayer_id_card_file": "https://example.com/uploads/ktp.pdf",
-  "land_certificate_file": "https://example.com/uploads/sertifikat.pdf",
-  "neighbor_sppt_file": "https://example.com/uploads/sppt.pdf",
-  "property_photo_file": "https://example.com/uploads/foto.jpg",
-  "power_of_attorney_file": "https://example.com/uploads/kuasa.pdf",
-  "supporting_document_file": "https://example.com/uploads/pendukung.zip"
+  "nama_awal": "Budi Santoso",
+  "nik_awal": "1234567890123456",
+  "alamat_rumah_awal": "Jl. Kenanga No. 5",
+  "no_telp_awal": "081234567890",
+  "provinsi_op": "DI Yogyakarta",
+  "kabupaten_op": "Sleman",
+  "kecamatan_op": "Depok",
+  "kelurahan_op": "Caturtunggal",
+  "blok_op": "001",
+  "no_urut_op": "0123",
+  "nama_lengkap": "Budi Santoso",
+  "nik": "1234567890123456",
+  "status_subjek": "WNI",
+  "pekerjaan_subjek": "Karyawan Swasta",
+  "npwp": "12.345.678.9-012.345",
+  "no_telp_subjek": "081234567890",
+  "jalan_subjek": "Jl. Mawar No. 10",
+  "blok_kav_no_subjek": "Blok B5",
+  "kelurahan_subjek": "Caturtunggal",
+  "kecamatan_subjek": "Depok",
+  "kabupaten_subjek": "Sleman",
+  "provinsi_subjek": "DI Yogyakarta",
+  "rt_subjek": "005",
+  "rw_subjek": "003",
+  "kode_pos_subjek": "55281",
+  "jenis_tanah": "Perumahan",
+  "luas_tanah": 150,
+  "file_ktp": "https://example.com/uploads/ktp.pdf",
+  "file_sertifikat": "https://example.com/uploads/sertifikat.pdf",
+  "file_sppt_tetangga": "https://example.com/uploads/sppt.pdf",
+  "file_foto_objek": "https://example.com/uploads/foto.jpg",
+  "file_surat_kuasa": null,
+  "file_pendukung": null
 }
 ```
+
+Contoh payload `POST /lsop`:
+
+```json
+{
+  "nop": "327601000100100100",
+  "jumlah_bangunan": 2,
+  "bangunan_ke": 1,
+  "jenis_penggunaan_bangunan": "Rumah",
+  "kondisi_bangunan": "Baik",
+  "tahun_dibangun": 2010,
+  "luas_bangunan_m2": 120,
+  "jumlah_lantai": 2,
+  "daya_listrik_watt": 2200,
+  "jenis_konstruksi": "Beton",
+  "jenis_atap": "Genteng",
+  "jenis_lantai": "Keramik",
+  "jenis_langit_langit": "Gypsum",
+  "jumlah_ac": 2,
+  "ac_sentral": false,
+  "panjang_pagar_meter": 20,
+  "pagar_bahan_bata_batako": true,
+  "pemadam_fire_alarm": true,
+  "foto_objek_pajak": "https://example.com/uploads/foto.jpg",
+  "formulir_sesuai_ketentuan": true
+}
+```
+
+Catatan: endpoint SPOP/LSOP menerima JSON maupun form-data (multipart/form-data atau application/x-www-form-urlencoded).
 
