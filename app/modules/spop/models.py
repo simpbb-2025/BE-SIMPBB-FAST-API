@@ -78,7 +78,7 @@ class DatSubjekPajak(Base):
 
 class SpopRegistration(Base):
     __tablename__ = "spop_registration"
-
+  
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
 
     # Bagian Paling Awal
@@ -126,13 +126,15 @@ class SpopRegistration(Base):
     file_foto_objek: Mapped[str] = mapped_column(String(255), nullable=False)
     file_surat_kuasa: Mapped[Optional[str]] = mapped_column(String(255))
     file_pendukung: Mapped[Optional[str]] = mapped_column(String(255))
+    tanggal_pelaksanaan: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    foto_objek_pajak: Mapped[Optional[str]] = mapped_column(String(255))
 
     # Petugas (diisi melalui endpoint staff)
     nama_petugas: Mapped[Optional[str]] = mapped_column(String(255))
     nip: Mapped[Optional[str]] = mapped_column(String(50))
 
     # Status & keterangan
-    status: Mapped[Optional[str]] = mapped_column(String(50))
+    status: Mapped[Optional[str]] = mapped_column("status_akhir", String(50))
     keterangan: Mapped[Optional[str]] = mapped_column(String(255))
 
     # Timestamp

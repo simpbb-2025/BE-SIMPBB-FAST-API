@@ -167,6 +167,8 @@ def _registration_to_record(registration: SpopRegistration) -> schemas.RequestRe
         file_foto_objek=registration.file_foto_objek,
         file_surat_kuasa=registration.file_surat_kuasa,
         file_pendukung=registration.file_pendukung,
+        tanggal_pelaksanaan=registration.tanggal_pelaksanaan,
+        foto_objek_pajak=registration.foto_objek_pajak,
         nama_petugas=registration.nama_petugas,
         nip=registration.nip,
         status=registration.status,
@@ -233,6 +235,8 @@ async def create_registration_request(
         keterangan=payload.keterangan.strip() if payload.keterangan else None,
         nama_petugas=None,
         nip=None,
+        tanggal_pelaksanaan=None,
+        foto_objek_pajak=None,
     )
 
     session.add(registration)

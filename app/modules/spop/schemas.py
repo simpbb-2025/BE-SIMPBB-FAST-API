@@ -308,6 +308,8 @@ class RequestRecord(BaseModel):
     file_foto_objek: str
     file_surat_kuasa: Optional[str] = None
     file_pendukung: Optional[str] = None
+    tanggal_pelaksanaan: Optional[datetime] = None
+    foto_objek_pajak: Optional[str] = None
     nama_petugas: Optional[str] = None
     nip: Optional[str] = None
     status: Optional[str] = None
@@ -394,6 +396,8 @@ class RequestDeleteResponse(BaseModel):
 class StaffUpdatePayload(BaseModel):
     nama_petugas: Optional[str] = Field(default=None, max_length=255)
     nip: Optional[str] = Field(default=None, max_length=50)
+    tanggal_pelaksanaan: Optional[datetime] = None
+    foto_objek_pajak: Optional[str] = Field(default=None, max_length=255)
 
     @model_validator(mode="after")
     def ensure_changes(self) -> "StaffUpdatePayload":
