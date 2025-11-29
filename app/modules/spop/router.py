@@ -879,6 +879,8 @@ async def delete_registration_request(
     return schemas.RequestDeleteResponse(message="Permohonan berhasil dihapus")
 
 
+
+
 async def _fetch_spop_detail(
     session: SessionDep,
     keys: Dict[str, str],

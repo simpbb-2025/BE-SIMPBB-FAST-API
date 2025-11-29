@@ -427,3 +427,4 @@ class RegionInfo(BaseModel):
 class StatusInfo(BaseModel):
     id: Optional[int] = None
     nama: Optional[str] = None
+
