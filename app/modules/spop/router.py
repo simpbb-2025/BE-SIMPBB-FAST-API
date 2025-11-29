@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from secrets import randbelow
 from datetime import datetime
+from pathlib import Path
+from uuid import uuid4
 from typing import Dict, Iterable, List, Optional, Tuple
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi import APIRouter, HTTPException, Query, Request, status, UploadFile
 from sqlalchemy import and_, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
@@ -116,6 +118,24 @@ def _format_nop_fields(
         _normalize_code(kode_khusus, 1) or kode_khusus,
     ]
     return ".".join(parts)
+
+
+UPLOAD_BASE = Path(__file__).resolve().parent.parent.parent / "storage" / "uploads"
+UPLOAD_ROOT = UPLOAD_BASE / "spop"
+UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+
+
+def _save_upload(file: UploadFile, module_dir: Path = UPLOAD_ROOT) -> str:
+    filename = file.filename or "file"
+    suffix = Path(filename).suffix
+    date_prefix = datetime.now().strftime("%Y%m%d")
+    unique_name = f"{date_prefix}-{uuid4().hex}{suffix}"
+    target_dir = module_dir
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target_path = target_dir / unique_name
+    with target_path.open("wb") as f:
+        f.write(file.file.read())
+    return str(target_path.relative_to(UPLOAD_BASE))
 
 
 async def _generate_no_urut(session: SessionDep) -> str:
@@ -604,13 +624,44 @@ async def _load_payload(request: Request, model_cls):
     return model_cls(**data)
 
 
+async def _load_payload_with_files(
+    request: Request,
+    model_cls,
+    file_fields: List[str],
+    module_dir: Path = UPLOAD_ROOT,
+):
+    content_type = request.headers.get("content-type", "")
+    if "multipart/form-data" not in content_type:
+        return await _load_payload(request, model_cls)
+    form = await request.form()
+    data = {}
+    for key in form:
+        val = form.get(key)
+        if isinstance(val, UploadFile) and key in file_fields:
+            if val.filename:
+                data[key] = _save_upload(val, module_dir)
+        else:
+            data[key] = val
+    for key in ("_method", "_put", "_patch"):
+        data.pop(key, None)
+    return model_cls(**data)
+
+
 @router.post("/requests", response_model=schemas.RequestResponse, status_code=status.HTTP_201_CREATED)
 async def create_registration_request(
     request: Request,
     session: SessionDep,
     current_user: CurrentUserDep,
 ) -> schemas.RequestResponse:
-    payload = await _load_payload(request, schemas.RequestCreatePayload)
+    file_fields = [
+        "file_ktp",
+        "file_sertifikat",
+        "file_sppt_tetangga",
+        "file_foto_objek",
+        "file_surat_kuasa",
+        "file_pendukung",
+    ]
+    payload = await _load_payload_with_files(request, schemas.RequestCreatePayload, file_fields, UPLOAD_ROOT)
     codes = await _resolve_region_codes(session, payload)
     blok = _normalize_code(payload.blok_op, 3)
     if not blok:
@@ -806,7 +857,10 @@ async def update_registration_request(
     for key, value in updates.items():
         if isinstance(value, str):
             value = value.strip()
-        setattr(registration, key, value)
+        if key == "status":
+            setattr(registration, "status", value)
+        else:
+            setattr(registration, key, value)
 
     await session.commit()
     await session.refresh(registration)
@@ -826,9 +880,7 @@ async def update_registration_request(
     return schemas.RequestResponse(message="Permohonan berhasil diperbarui", data=record)
 
 
-@router.patch("/requests/staff/{request_id}", response_model=schemas.RequestResponse)
-@router.put("/requests/staff/{request_id}", response_model=schemas.RequestResponse, include_in_schema=False)
-@router.post("/requests/staff/{request_id}", response_model=schemas.RequestResponse, include_in_schema=False)
+@router.post("/staff/{request_id}", response_model=schemas.RequestResponse, include_in_schema=False)
 async def update_registration_staff_fields(
     request_id: str,
     request: Request,
@@ -839,7 +891,7 @@ async def update_registration_staff_fields(
     if registration is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Permohonan tidak ditemukan")
 
-    payload = await _load_payload(request, schemas.StaffUpdatePayload)
+    payload = await _load_payload_with_files(request, schemas.StaffUpdatePayload, ["foto_objek_pajak"], UPLOAD_ROOT)
     updates = payload.model_dump(exclude_unset=True, exclude_none=True)
     for key, value in updates.items():
         if isinstance(value, str):

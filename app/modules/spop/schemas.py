@@ -409,6 +409,8 @@ class StaffUpdatePayload(BaseModel):
     nip: Optional[str] = Field(default=None, max_length=50)
     tanggal_pelaksanaan: Optional[datetime] = None
     foto_objek_pajak: Optional[str] = Field(default=None, max_length=255)
+    status: Optional[str] = Field(default=None, max_length=50)
+    keterangan: Optional[str] = Field(default=None, max_length=255)
 
     @model_validator(mode="after")
     def ensure_changes(self) -> "StaffUpdatePayload":
@@ -427,4 +429,3 @@ class RegionInfo(BaseModel):
 class StatusInfo(BaseModel):
     id: Optional[int] = None
     nama: Optional[str] = None
-
