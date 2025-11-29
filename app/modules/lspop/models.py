@@ -46,7 +46,7 @@ class LampiranSpop(Base):
     kolam_renang_diplester: Mapped[Optional[bool]] = mapped_column(Boolean)
     kolam_renang_dengan_pelapis: Mapped[Optional[bool]] = mapped_column(Boolean)
 
-    # Lapangan Tenis (Lampu & Tanpa Lampu)
+    # Lapangan Tenis
     tenis_lampu_beton: Mapped[Optional[int]] = mapped_column(Integer)
     tenis_lampu_aspal: Mapped[Optional[int]] = mapped_column(Integer)
     tenis_lampu_tanah_liat: Mapped[Optional[int]] = mapped_column(Integer)
@@ -60,7 +60,7 @@ class LampiranSpop(Base):
     jumlah_lift_kapsul: Mapped[Optional[int]] = mapped_column(Integer)
     jumlah_lift_barang: Mapped[Optional[int]] = mapped_column(Integer)
 
-    # Tangga Berjalan (Eskalator)
+    # Tangga Berjalan
     jumlah_tangga_berjalan_lebar_kurang_80_cm: Mapped[Optional[int]] = mapped_column(Integer)
     jumlah_tangga_berjalan_lebar_lebih_80_cm: Mapped[Optional[int]] = mapped_column(Integer)
 
@@ -114,9 +114,6 @@ class LampiranSpop(Base):
 
     # Berkas
     foto_objek_pajak: Mapped[Optional[str]] = mapped_column(String(255))
-
-    # Pernyataan
-    formulir_sesuai_ketentuan: Mapped[Optional[bool]] = mapped_column(Boolean)
 
     submitted_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
 

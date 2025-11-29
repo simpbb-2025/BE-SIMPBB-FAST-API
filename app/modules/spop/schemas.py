@@ -269,6 +269,7 @@ class RequestRecord(BaseModel):
     id: str
     submitted_at: datetime
 
+    nop: Optional[str] = None
     no_formulir: Optional[str]
     nama_awal: str
     nik_awal: str

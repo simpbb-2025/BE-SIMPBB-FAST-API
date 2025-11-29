@@ -114,11 +114,7 @@ Semua endpoint di bawah membutuhkan bearer token kecuali `POST /auth/login`.
 - `GET /spop/requests/{request_id}` - detail permohonan.
 - `PUT /spop/requests/{request_id}` - perbarui permohonan (menerima JSON atau form-data; juga tersedia `PATCH` dan alias `POST` untuk klien yang tidak mendukung PUT/PATCH).
 - `DELETE /spop/requests/{request_id}` - hapus permohonan.
-- `POST /lsop` - buat lampiran SPOP (`lampiran_spop`) untuk bangunan (JSON atau form-data).
-- `GET /lsop` - daftar lampiran (pagination `page`, `limit`, filter `nop`).
-- `GET /lsop/{id}` - detail lampiran.
-- `PUT /lsop/{id}` - perbarui lampiran (JSON atau form-data; juga tersedia `PATCH` dan alias `POST` untuk klien yang tidak mendukung PUT/PATCH).
-- `DELETE /lsop/{id}` - hapus lampiran.
+- (LSOP module dihapus sesuai permintaan; tidak ada endpoint `/lsop`)
 
 Contoh payload `POST /spop/requests`:
 
@@ -160,32 +156,5 @@ Contoh payload `POST /spop/requests`:
 }
 ```
 
-Contoh payload `POST /lsop`:
-
-```json
-{
-  "nop": "327601000100100100",
-  "jumlah_bangunan": 2,
-  "bangunan_ke": 1,
-  "jenis_penggunaan_bangunan": "Rumah",
-  "kondisi_bangunan": "Baik",
-  "tahun_dibangun": 2010,
-  "luas_bangunan_m2": 120,
-  "jumlah_lantai": 2,
-  "daya_listrik_watt": 2200,
-  "jenis_konstruksi": "Beton",
-  "jenis_atap": "Genteng",
-  "jenis_lantai": "Keramik",
-  "jenis_langit_langit": "Gypsum",
-  "jumlah_ac": 2,
-  "ac_sentral": false,
-  "panjang_pagar_meter": 20,
-  "pagar_bahan_bata_batako": true,
-  "pemadam_fire_alarm": true,
-  "foto_objek_pajak": "https://example.com/uploads/foto.jpg",
-  "formulir_sesuai_ketentuan": true
-}
-```
-
-Catatan: endpoint SPOP/LSOP menerima JSON maupun form-data (multipart/form-data atau application/x-www-form-urlencoded).
+Catatan: endpoint SPOP menerima JSON maupun form-data (multipart/form-data atau application/x-www-form-urlencoded).
 

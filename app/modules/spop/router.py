@@ -65,6 +65,27 @@ def _compose_nop(fields: Dict[str, str]) -> str:
     return "".join(fields[key] for key, _ in NOP_SEGMENTS)
 
 
+def _compose_registration_nop(payload: schemas.RequestCreatePayload, kd_jns_op: str = "0") -> Dict[str, str]:
+    parts = [
+        payload.provinsi_op,
+        payload.kabupaten_op,
+        payload.kecamatan_op,
+        payload.kelurahan_op,
+        payload.blok_op,
+        payload.no_urut_op,
+        kd_jns_op,
+    ]
+    normalized: Dict[str, str] = {}
+    for (key, length), value in zip(NOP_SEGMENTS, parts):
+        normalized_value = _normalize_code(value, length)
+        if not normalized_value:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"Kolom {key} tidak valid"
+            )
+        normalized[key] = normalized_value
+    return normalized
+
+
 def _keys_from_components(
     kd_propinsi: str,
     kd_dati2: str,
@@ -133,6 +154,7 @@ def _registration_to_record(registration: SpopRegistration) -> schemas.RequestRe
     return schemas.RequestRecord(
         id=registration.id,
         submitted_at=registration.submitted_at,
+        nop=registration.nop,
         no_formulir=registration.no_formulir,
         nama_awal=registration.nama_awal,
         nik_awal=registration.nik_awal,
@@ -194,20 +216,23 @@ async def create_registration_request(
     current_user: CurrentUserDep,
 ) -> schemas.RequestResponse:
     payload = await _load_payload(request, schemas.RequestCreatePayload)
+    normalized = _compose_registration_nop(payload)
+    nop_value = _compose_nop(normalized)
     form_number = datetime.now().strftime("%Y.%m.%d.%H.%M")
     registration = SpopRegistration(
         id=uuid4().hex,
+        nop=nop_value,
         no_formulir=form_number,
         nama_awal=payload.nama_awal.strip(),
         nik_awal=payload.nik_awal.strip(),
         alamat_rumah_awal=payload.alamat_rumah_awal.strip(),
         no_telp_awal=payload.no_telp_awal.strip(),
-        provinsi_op=payload.provinsi_op.strip(),
-        kabupaten_op=payload.kabupaten_op.strip(),
-        kecamatan_op=payload.kecamatan_op.strip(),
-        kelurahan_op=payload.kelurahan_op.strip(),
-        blok_op=payload.blok_op.strip(),
-        no_urut_op=payload.no_urut_op.strip(),
+        provinsi_op=normalized["kd_propinsi"],
+        kabupaten_op=normalized["kd_dati2"],
+        kecamatan_op=normalized["kd_kecamatan"],
+        kelurahan_op=normalized["kd_kelurahan"],
+        blok_op=normalized["kd_blok"],
+        no_urut_op=normalized["no_urut"],
         nama_lengkap=payload.nama_lengkap.strip(),
         nik=payload.nik.strip(),
         status_subjek=payload.status_subjek.strip(),
@@ -249,6 +274,8 @@ async def create_registration_request(
 
 
 @router.get("/requests", response_model=schemas.RequestListResponse)
+@router.get("", response_model=schemas.RequestListResponse, include_in_schema=True)
+@router.get("/", response_model=schemas.RequestListResponse, include_in_schema=False)
 async def list_registration_requests(
     session: SessionDep,
     current_user: CurrentUserDep,
@@ -278,8 +305,8 @@ async def list_registration_requests(
     )
     return schemas.RequestListResponse(message="Daftar permohonan berhasil diambil", data=data, meta=meta)
 
-
 @router.get("/requests/{request_id}", response_model=schemas.RequestResponse)
+@router.get("/{request_id}", response_model=schemas.RequestResponse, include_in_schema=False)
 async def get_registration_request(
     request_id: str,
     session: SessionDep,
@@ -295,6 +322,9 @@ async def get_registration_request(
 @router.patch("/requests/{request_id}", response_model=schemas.RequestResponse)
 @router.put("/requests/{request_id}", response_model=schemas.RequestResponse, include_in_schema=False)
 @router.post("/requests/{request_id}", response_model=schemas.RequestResponse, include_in_schema=False)
+@router.patch("/{request_id}", response_model=schemas.RequestResponse, include_in_schema=False)
+@router.put("/{request_id}", response_model=schemas.RequestResponse, include_in_schema=False)
+@router.post("/{request_id}", response_model=schemas.RequestResponse, include_in_schema=False)
 async def update_registration_request(
     request_id: str,
     request: Request,
@@ -345,6 +375,7 @@ async def update_registration_staff_fields(
 
 
 @router.delete("/requests/{request_id}", response_model=schemas.RequestDeleteResponse)
+@router.delete("/{request_id}", response_model=schemas.RequestDeleteResponse, include_in_schema=False)
 async def delete_registration_request(
     request_id: str,
     session: SessionDep,
@@ -505,8 +536,8 @@ async def _get_detail_or_404(session: SessionDep, keys: Dict[str, str]) -> schem
     return _spop_to_detail(row)
 
 
-@router.get("", response_model=schemas.SpopSearchResponse)
-@router.get("/", response_model=schemas.SpopSearchResponse, include_in_schema=False)
+@router.get("/legacy", response_model=schemas.SpopSearchResponse, include_in_schema=False)
+@router.get("/legacy/", response_model=schemas.SpopSearchResponse, include_in_schema=False)
 async def list_spop(
     *,
     session: SessionDep,

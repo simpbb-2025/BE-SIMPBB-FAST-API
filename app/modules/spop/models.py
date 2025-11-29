@@ -82,6 +82,7 @@ class SpopRegistration(Base):
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
 
     # Bagian Paling Awal
+    nop: Mapped[Optional[str]] = mapped_column(String(20))
     no_formulir: Mapped[Optional[str]] = mapped_column(String(20))
     nama_awal: Mapped[str] = mapped_column(String(255), nullable=False)
     nik_awal: Mapped[str] = mapped_column(String(50), nullable=False)
