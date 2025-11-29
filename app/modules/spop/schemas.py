@@ -223,17 +223,19 @@ class RiwayatResponse(BaseModel):
 
 
 class RequestCreatePayload(BaseModel):
+    provinsi_op: int
+    kabupaten_op: int
+    kecamatan_op: int
+    kelurahan_op: int
+
     nama_awal: str
     nik_awal: str = Field(max_length=50)
     alamat_rumah_awal: str
     no_telp_awal: str = Field(max_length=30)
 
-    provinsi_op: str
-    kabupaten_op: str
-    kecamatan_op: str
-    kelurahan_op: str
     blok_op: str
     no_urut_op: str
+    kode_khusus: Optional[int] = None
 
     nama_lengkap: str
     nik: str = Field(max_length=50)
@@ -264,6 +266,12 @@ class RequestCreatePayload(BaseModel):
     status: Optional[str] = None
     keterangan: Optional[str] = None
 
+    @model_validator(mode="after")
+    def ensure_region_ids(self) -> "RequestCreatePayload":
+        if not all([self.provinsi_op, self.kabupaten_op, self.kecamatan_op, self.kelurahan_op]):
+            raise ValueError("ID wilayah wajib diisi")
+        return self
+
 
 class RequestRecord(BaseModel):
     id: str
@@ -282,6 +290,7 @@ class RequestRecord(BaseModel):
     kelurahan_op: str
     blok_op: str
     no_urut_op: str
+    kode_khusus: Optional[int] = None
 
     nama_lengkap: str
     nik: str
@@ -345,12 +354,13 @@ class RequestUpdatePayload(BaseModel):
     alamat_rumah_awal: Optional[str] = Field(default=None, max_length=255)
     no_telp_awal: Optional[str] = Field(default=None, max_length=30)
 
-    provinsi_op: Optional[str] = Field(default=None, max_length=100)
-    kabupaten_op: Optional[str] = Field(default=None, max_length=100)
-    kecamatan_op: Optional[str] = Field(default=None, max_length=100)
-    kelurahan_op: Optional[str] = Field(default=None, max_length=100)
+    provinsi_op: Optional[int] = None
+    kabupaten_op: Optional[int] = None
+    kecamatan_op: Optional[int] = None
+    kelurahan_op: Optional[int] = None
     blok_op: Optional[str] = Field(default=None, max_length=50)
     no_urut_op: Optional[str] = Field(default=None, max_length=50)
+    kode_khusus: Optional[int] = None
 
     nama_lengkap: Optional[str] = Field(default=None, max_length=255)
     nik: Optional[str] = Field(default=None, max_length=50)

@@ -18,6 +18,10 @@ from app.modules.spop.models import (
     RefKecamatan,
     RefKelurahan,
     RefPropinsi,
+    RefProvinsi,
+    RefKabupaten,
+    RefKecamatanBaru,
+    RefKelurahanBaru,
     Spop,
     SpopRegistration,
 )
@@ -67,10 +71,10 @@ def _compose_nop(fields: Dict[str, str]) -> str:
 
 def _compose_registration_nop(payload: schemas.RequestCreatePayload, kd_jns_op: str = "0") -> Dict[str, str]:
     parts = [
-        payload.provinsi_op,
-        payload.kabupaten_op,
-        payload.kecamatan_op,
-        payload.kelurahan_op,
+        str(payload.provinsi_op),
+        str(payload.kabupaten_op),
+        str(payload.kecamatan_op),
+        str(payload.kelurahan_op),
         payload.blok_op,
         payload.no_urut_op,
         kd_jns_op,
@@ -84,6 +88,113 @@ def _compose_registration_nop(payload: schemas.RequestCreatePayload, kd_jns_op: 
             )
         normalized[key] = normalized_value
     return normalized
+
+
+def _pad(value: int, length: int) -> str:
+    return f"{value:0{length}d}"
+
+
+def _format_nop_fields(
+    kd_propinsi: str,
+    kd_dati2: str,
+    kd_kecamatan: str,
+    kd_kelurahan: str,
+    kd_blok: str,
+    no_urut: str,
+    kode_khusus: str,
+) -> str:
+    parts = [
+        _normalize_code(kd_propinsi, 2) or "",
+        _normalize_code(kd_dati2, 2) or "",
+        _normalize_code(kd_kecamatan, 3) or "",
+        _normalize_code(kd_kelurahan, 3) or "",
+        _normalize_code(kd_blok, 3) or "",
+        _normalize_code(no_urut, 4) or "",
+        _normalize_code(kode_khusus, 1) or kode_khusus,
+    ]
+    return ".".join(parts)
+
+
+async def _generate_no_urut(session: SessionDep) -> str:
+    stmt = select(func.max(SpopRegistration.no_urut_op))
+    result = await session.execute(stmt)
+    current = result.scalar_one_or_none()
+    try:
+        current_int = int(current) if current is not None else 0
+    except ValueError:
+        current_int = 0
+    next_val = current_int + 1
+    return str(next_val)
+
+
+async def _generate_kode_khusus(session: SessionDep) -> str:
+    stmt = select(func.max(SpopRegistration.kode_khusus))
+    result = await session.execute(stmt)
+    current = result.scalar_one_or_none()
+    try:
+        current_int = int(current) if current is not None else 0
+    except ValueError:
+        current_int = 0
+    next_val = current_int + 1
+    return str(next_val)
+
+
+async def _build_code_maps(
+    session: SessionDep,
+    regs: Iterable[SpopRegistration],
+) -> Dict[str, Dict[str, str]]:
+    prov_ids = {reg.provinsi_op for reg in regs if reg.provinsi_op is not None}
+    kab_ids = {reg.kabupaten_op for reg in regs if reg.kabupaten_op is not None}
+    kec_ids = {reg.kecamatan_op for reg in regs if reg.kecamatan_op is not None}
+    kel_ids = {reg.kelurahan_op for reg in regs if reg.kelurahan_op is not None}
+
+    prov_map: Dict[int, str] = {}
+    if prov_ids:
+        rows = await session.execute(
+            select(RefProvinsi.id_provinsi, RefProvinsi.kode_provinsi).where(RefProvinsi.id_provinsi.in_(prov_ids))
+        )
+        prov_map = {row.id_provinsi: _pad(row.kode_provinsi, 2) for row in rows}
+
+    kab_map: Dict[int, str] = {}
+    if kab_ids:
+        rows = await session.execute(
+            select(RefKabupaten.id_kabupaten, RefKabupaten.kode_kabupaten).where(
+                RefKabupaten.id_kabupaten.in_(kab_ids)
+            )
+        )
+        kab_map = {row.id_kabupaten: _pad(row.kode_kabupaten, 2) for row in rows}
+
+    kec_map: Dict[int, str] = {}
+    if kec_ids:
+        rows = await session.execute(
+            select(RefKecamatanBaru.id_kecamatan, RefKecamatanBaru.kode_kecamatan).where(
+                RefKecamatanBaru.id_kecamatan.in_(kec_ids)
+            )
+        )
+        kec_map = {row.id_kecamatan: _pad(row.kode_kecamatan, 3) for row in rows}
+
+    kel_map: Dict[int, str] = {}
+    if kel_ids:
+        rows = await session.execute(
+            select(RefKelurahanBaru.id_kelurahan, RefKelurahanBaru.kode_kelurahan).where(
+                RefKelurahanBaru.id_kelurahan.in_(kel_ids)
+            )
+        )
+        kel_map = {row.id_kelurahan: _pad(row.kode_kelurahan, 3) for row in rows}
+
+    code_map: Dict[str, Dict[str, str]] = {}
+    for reg in regs:
+        pid = reg.provinsi_op
+        kid = reg.kabupaten_op
+        kecid = reg.kecamatan_op
+        kelid = reg.kelurahan_op
+        code_map[reg.id] = {
+            "kd_propinsi": prov_map.get(pid, ""),
+            "kd_dati2": kab_map.get(kid, ""),
+            "kd_kecamatan": kec_map.get(kecid, ""),
+            "kd_kelurahan": kel_map.get(kelid, ""),
+        }
+    return code_map
 
 
 def _keys_from_components(
@@ -114,6 +225,34 @@ def _keys_from_components(
             )
         result[key] = normalized
     return result
+
+
+async def _resolve_region_codes(session: SessionDep, payload: schemas.RequestCreatePayload) -> Dict[str, str]:
+    prov = await session.get(RefProvinsi, payload.provinsi_op)
+    if prov is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Provinsi tidak ditemukan")
+
+    kab = await session.get(RefKabupaten, payload.kabupaten_op)
+    if kab is None or kab.id_provinsi != prov.id_provinsi:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Kabupaten tidak sesuai provinsi")
+
+    kec = await session.get(RefKecamatanBaru, payload.kecamatan_op)
+    if kec is None or kec.id_provinsi != prov.id_provinsi or kec.id_kabupaten != kab.id_kabupaten:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Kecamatan tidak sesuai kabupaten/provinsi")
+
+    kel = await session.get(RefKelurahanBaru, payload.kelurahan_op)
+    if kel is None or kel.id_provinsi != prov.id_provinsi or kel.id_kabupaten != kab.id_kabupaten or kel.id_kecamatan != kec.id_kecamatan:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Kelurahan tidak sesuai kecamatan/kabupaten/provinsi",
+        )
+
+    return {
+        "kd_propinsi": f"{prov.kode_provinsi:02d}",
+        "kd_dati2": f"{kab.kode_kabupaten:02d}",
+        "kd_kecamatan": f"{kec.kode_kecamatan:03d}",
+        "kd_kelurahan": f"{kel.kode_kelurahan:03d}",
+    }
 
 
 def _trim(expr):
@@ -150,22 +289,32 @@ async def _ensure_subjek_exists(session: SessionDep, subjek_pajak_id: str) -> No
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Subjek pajak tidak ditemukan")
 
 
-def _registration_to_record(registration: SpopRegistration) -> schemas.RequestRecord:
+def _registration_to_record(registration: SpopRegistration, codes: Dict[str, str]) -> schemas.RequestRecord:
+    formatted_nop = _format_nop_fields(
+        codes.get("kd_propinsi", ""),
+        codes.get("kd_dati2", ""),
+        codes.get("kd_kecamatan", ""),
+        codes.get("kd_kelurahan", ""),
+        registration.blok_op,
+        registration.no_urut_op,
+        str(registration.kode_khusus or ""),
+    )
     return schemas.RequestRecord(
         id=registration.id,
         submitted_at=registration.submitted_at,
-        nop=registration.nop,
+        nop=formatted_nop,
         no_formulir=registration.no_formulir,
         nama_awal=registration.nama_awal,
         nik_awal=registration.nik_awal,
         alamat_rumah_awal=registration.alamat_rumah_awal,
         no_telp_awal=registration.no_telp_awal,
-        provinsi_op=registration.provinsi_op,
-        kabupaten_op=registration.kabupaten_op,
-        kecamatan_op=registration.kecamatan_op,
-        kelurahan_op=registration.kelurahan_op,
+        provinsi_op=codes.get("kd_propinsi", ""),
+        kabupaten_op=codes.get("kd_dati2", ""),
+        kecamatan_op=codes.get("kd_kecamatan", ""),
+        kelurahan_op=codes.get("kd_kelurahan", ""),
         blok_op=registration.blok_op,
         no_urut_op=registration.no_urut_op,
+        kode_khusus=registration.kode_khusus,
         nama_lengkap=registration.nama_lengkap,
         nik=registration.nik,
         status_subjek=registration.status_subjek,
@@ -216,8 +365,41 @@ async def create_registration_request(
     current_user: CurrentUserDep,
 ) -> schemas.RequestResponse:
     payload = await _load_payload(request, schemas.RequestCreatePayload)
-    normalized = _compose_registration_nop(payload)
-    nop_value = _compose_nop(normalized)
+    codes = await _resolve_region_codes(session, payload)
+    blok = _normalize_code(payload.blok_op, 3)
+    if not blok:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Blok tidak valid")
+
+    no_urut = _normalize_code(payload.no_urut_op, 4)
+    if not no_urut:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No Urut tidak valid")
+
+    if payload.kode_khusus is not None:
+        kode_khusus = str(payload.kode_khusus)
+    else:
+        kode_khusus = await _generate_kode_khusus(session)
+
+    nop_fields = {
+        "kd_propinsi": codes["kd_propinsi"],
+        "kd_dati2": codes["kd_dati2"],
+        "kd_kecamatan": codes["kd_kecamatan"],
+        "kd_kelurahan": codes["kd_kelurahan"],
+        "kd_blok": blok,
+        "no_urut": no_urut,
+        "kd_jns_op": kode_khusus,
+    }
+    nop_value = _format_nop_fields(
+        codes["kd_propinsi"],
+        codes["kd_dati2"],
+        codes["kd_kecamatan"],
+        codes["kd_kelurahan"],
+        blok,
+        no_urut,
+        kode_khusus,
+    )
+    existing_nop = await session.execute(select(SpopRegistration.id).where(SpopRegistration.nop == nop_value).limit(1))
+    if existing_nop.scalar_one_or_none() is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="NOP sudah terdaftar")
     form_number = datetime.now().strftime("%Y.%m.%d.%H.%M")
     registration = SpopRegistration(
         id=uuid4().hex,
@@ -227,12 +409,13 @@ async def create_registration_request(
         nik_awal=payload.nik_awal.strip(),
         alamat_rumah_awal=payload.alamat_rumah_awal.strip(),
         no_telp_awal=payload.no_telp_awal.strip(),
-        provinsi_op=normalized["kd_propinsi"],
-        kabupaten_op=normalized["kd_dati2"],
-        kecamatan_op=normalized["kd_kecamatan"],
-        kelurahan_op=normalized["kd_kelurahan"],
-        blok_op=normalized["kd_blok"],
-        no_urut_op=normalized["no_urut"],
+        provinsi_op=payload.provinsi_op,
+        kabupaten_op=payload.kabupaten_op,
+        kecamatan_op=payload.kecamatan_op,
+        kelurahan_op=payload.kelurahan_op,
+        blok_op=blok,
+        no_urut_op=no_urut,
+        kode_khusus=int(kode_khusus),
         nama_lengkap=payload.nama_lengkap.strip(),
         nik=payload.nik.strip(),
         status_subjek=payload.status_subjek.strip(),
@@ -269,7 +452,16 @@ async def create_registration_request(
     await session.commit()
 
     await session.refresh(registration)
-    record = _registration_to_record(registration)
+    record = _registration_to_record(registration, codes)
+    record.nop = _format_nop_fields(
+        codes.get("kd_propinsi", ""),
+        codes.get("kd_dati2", ""),
+        codes.get("kd_kecamatan", ""),
+        codes.get("kd_kelurahan", ""),
+        registration.blok_op,
+        registration.no_urut_op,
+        str(registration.kode_khusus or ""),
+    )
     return schemas.RequestResponse(message="Permohonan berhasil dibuat", data=record)
 
 
@@ -290,9 +482,21 @@ async def list_registration_requests(
     result = await session.execute(stmt.offset(offset).limit(limit))
     rows = result.scalars().all()
 
+    code_map = await _build_code_maps(session, rows)
     data: List[schemas.RequestRecord] = []
     for row in rows:
-        data.append(_registration_to_record(row))
+        codes = code_map.get(row.id, {})
+        rec = _registration_to_record(row, codes)
+        rec.nop = _format_nop_fields(
+            codes.get("kd_propinsi", ""),
+            codes.get("kd_dati2", ""),
+            codes.get("kd_kecamatan", ""),
+            codes.get("kd_kelurahan", ""),
+            row.blok_op,
+            row.no_urut_op,
+            str(row.kode_khusus or ""),
+        )
+        data.append(rec)
 
     pages = (total + limit - 1) // limit if total else 0
     meta = schemas.RequestPagination(
@@ -315,7 +519,17 @@ async def get_registration_request(
     registration = await session.get(SpopRegistration, request_id)
     if registration is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Permohonan tidak ditemukan")
-    record = _registration_to_record(registration)
+    codes = (await _build_code_maps(session, [registration])).get(registration.id, {})
+    record = _registration_to_record(registration, codes)
+    record.nop = _format_nop_fields(
+        codes.get("kd_propinsi", ""),
+        codes.get("kd_dati2", ""),
+        codes.get("kd_kecamatan", ""),
+        codes.get("kd_kelurahan", ""),
+        registration.blok_op,
+        registration.no_urut_op,
+        str(registration.kode_khusus or ""),
+    )
     return schemas.RequestResponse(message="Detail permohonan berhasil diambil", data=record)
 
 
@@ -344,7 +558,17 @@ async def update_registration_request(
 
     await session.commit()
     await session.refresh(registration)
-    record = _registration_to_record(registration)
+    codes = (await _build_code_maps(session, [registration])).get(registration.id, {})
+    record = _registration_to_record(registration, codes)
+    record.nop = _format_nop_fields(
+        codes.get("kd_propinsi", ""),
+        codes.get("kd_dati2", ""),
+        codes.get("kd_kecamatan", ""),
+        codes.get("kd_kelurahan", ""),
+        registration.blok_op,
+        registration.no_urut_op,
+        str(registration.kode_khusus or ""),
+    )
     return schemas.RequestResponse(message="Permohonan berhasil diperbarui", data=record)
 
 
@@ -370,7 +594,17 @@ async def update_registration_staff_fields(
 
     await session.commit()
     await session.refresh(registration)
-    record = _registration_to_record(registration)
+    codes = (await _build_code_maps(session, [registration])).get(registration.id, {})
+    record = _registration_to_record(registration, codes)
+    record.nop = _format_nop_fields(
+        codes.get("kd_propinsi", ""),
+        codes.get("kd_dati2", ""),
+        codes.get("kd_kecamatan", ""),
+        codes.get("kd_kelurahan", ""),
+        registration.blok_op,
+        registration.no_urut_op,
+        str(registration.kode_khusus or ""),
+    )
     return schemas.RequestResponse(message="Data petugas berhasil diperbarui", data=record)
 
 

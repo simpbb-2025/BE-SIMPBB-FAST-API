@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import BigInteger, Date, DateTime, String
+from sqlalchemy import BigInteger, Date, DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -58,6 +58,44 @@ class Spop(Base):
     no_persil: Mapped[Optional[str]] = mapped_column("NO_PERSIL", String(5))
 
 
+class RefProvinsi(Base):
+    __tablename__ = "provinsi"
+
+    id_provinsi: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    kode_provinsi: Mapped[int] = mapped_column(Integer, nullable=False)
+    nama_provinsi: Mapped[str] = mapped_column(String(100), nullable=False)
+
+
+class RefKabupaten(Base):
+    __tablename__ = "kabupaten_kota"
+
+    id_kabupaten: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id_provinsi: Mapped[int] = mapped_column(Integer, nullable=False)
+    kode_kabupaten: Mapped[int] = mapped_column(Integer, nullable=False)
+    nama_kabupaten: Mapped[str] = mapped_column(String(100), nullable=False)
+
+
+class RefKecamatanBaru(Base):
+    __tablename__ = "kecamatan"
+
+    id_kecamatan: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id_provinsi: Mapped[int] = mapped_column(Integer, nullable=False)
+    id_kabupaten: Mapped[int] = mapped_column(Integer, nullable=False)
+    kode_kecamatan: Mapped[int] = mapped_column(Integer, nullable=False)
+    nama_kecamatan: Mapped[str] = mapped_column(String(100), nullable=False)
+
+
+class RefKelurahanBaru(Base):
+    __tablename__ = "kelurahan_desa"
+
+    id_kelurahan: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id_provinsi: Mapped[int] = mapped_column(Integer, nullable=False)
+    id_kabupaten: Mapped[int] = mapped_column(Integer, nullable=False)
+    id_kecamatan: Mapped[int] = mapped_column(Integer, nullable=False)
+    kode_kelurahan: Mapped[int] = mapped_column(Integer, nullable=False)
+    nama_kelurahan: Mapped[str] = mapped_column(String(120), nullable=False)
+
+
 class DatSubjekPajak(Base):
     __tablename__ = "dat_subjek_pajak"
 
@@ -82,7 +120,7 @@ class SpopRegistration(Base):
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
 
     # Bagian Paling Awal
-    nop: Mapped[Optional[str]] = mapped_column(String(20))
+    nop: Mapped[Optional[str]] = mapped_column(String(32))
     no_formulir: Mapped[Optional[str]] = mapped_column(String(20))
     nama_awal: Mapped[str] = mapped_column(String(255), nullable=False)
     nik_awal: Mapped[str] = mapped_column(String(50), nullable=False)
@@ -90,12 +128,13 @@ class SpopRegistration(Base):
     no_telp_awal: Mapped[str] = mapped_column(String(30), nullable=False)
 
     # Data Letak Objek Pajak
-    provinsi_op: Mapped[str] = mapped_column(String(100), nullable=False)
-    kabupaten_op: Mapped[str] = mapped_column(String(100), nullable=False)
-    kecamatan_op: Mapped[str] = mapped_column(String(100), nullable=False)
-    kelurahan_op: Mapped[str] = mapped_column(String(100), nullable=False)
+    provinsi_op: Mapped[int] = mapped_column(Integer, nullable=False)
+    kabupaten_op: Mapped[int] = mapped_column(Integer, nullable=False)
+    kecamatan_op: Mapped[int] = mapped_column(Integer, nullable=False)
+    kelurahan_op: Mapped[int] = mapped_column(Integer, nullable=False)
     blok_op: Mapped[str] = mapped_column(String(50), nullable=False)
     no_urut_op: Mapped[str] = mapped_column(String(50), nullable=False)
+    kode_khusus: Mapped[Optional[int]] = mapped_column(Integer)
 
     # Data Subjek Pajak
     nama_lengkap: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -146,6 +185,10 @@ __all__ = [
     "Spop",
     "DatSubjekPajak",
     "SpopRegistration",
+    "RefProvinsi",
+    "RefKabupaten",
+    "RefKecamatanBaru",
+    "RefKelurahanBaru",
     "RefPropinsi",
     "RefDati2",
     "RefKecamatan",
