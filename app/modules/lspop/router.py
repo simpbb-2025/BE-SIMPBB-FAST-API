@@ -9,7 +9,6 @@ from sqlalchemy import func, select
 from app.core.deps import CurrentUserDep, SessionDep
 from app.modules.lspop import schemas
 from app.modules.lspop.models import LampiranSpop
-from app.modules.spop.models import SpopRegistration
 
 router = APIRouter(prefix="/lspop", tags=["lspop"])
 
@@ -78,13 +77,6 @@ def _to_record(row: LampiranSpop) -> schemas.LampiranRecord:
     )
 
 
-def _normalize_nop(nop: str) -> str:
-    digits = "".join(ch for ch in nop if ch.isdigit())
-    if len(digits) != 18:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="NOP harus 18 digit")
-    return digits
-
-
 async def _load_payload(request: Request, model_cls):
     try:
         data = await request.json()
@@ -103,15 +95,8 @@ async def create_lspop(
     current_user: CurrentUserDep,
 ) -> schemas.LampiranResponse:
     payload = await _load_payload(request, schemas.LampiranCreatePayload)
-    normalized_nop = _normalize_nop(payload.nop)
-    exists = await session.execute(
-        select(SpopRegistration.nop).where(SpopRegistration.nop == normalized_nop).limit(1)
-    )
-    if exists.scalar_one_or_none() is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="NOP tidak ditemukan di SPOP")
     entity = LampiranSpop(id=uuid4().hex)
     data = payload.model_dump(exclude_unset=True)
-    data["nop"] = normalized_nop
     for key, value in data.items():
         if isinstance(value, str):
             value = value.strip()
@@ -137,9 +122,8 @@ async def list_lspop(
     count_stmt = select(func.count()).select_from(LampiranSpop)
 
     if nop:
-        normalized_nop = _normalize_nop(nop)
-        stmt = stmt.where(LampiranSpop.nop == normalized_nop)
-        count_stmt = count_stmt.where(LampiranSpop.nop == normalized_nop)
+        stmt = stmt.where(LampiranSpop.nop == nop)
+        count_stmt = count_stmt.where(LampiranSpop.nop == nop)
 
     total = (await session.execute(count_stmt)).scalar_one()
     offset = (page - 1) * limit
@@ -187,13 +171,6 @@ async def update_lspop(
 
     payload = await _load_payload(request, schemas.LampiranUpdatePayload)
     updates = payload.model_dump(exclude_unset=True, exclude_none=True)
-    if "nop" in updates:
-        updates["nop"] = _normalize_nop(updates["nop"])
-        exists = await session.execute(
-            select(SpopRegistration.nop).where(SpopRegistration.nop == updates["nop"]).limit(1)
-        )
-        if exists.scalar_one_or_none() is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="NOP tidak ditemukan di SPOP")
     for key, value in updates.items():
         if isinstance(value, str):
             value = value.strip()

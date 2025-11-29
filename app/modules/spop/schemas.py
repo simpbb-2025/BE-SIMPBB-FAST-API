@@ -239,22 +239,22 @@ class RequestCreatePayload(BaseModel):
 
     nama_lengkap: str
     nik: str = Field(max_length=50)
-    status_subjek: str
-    pekerjaan_subjek: str
+    status_subjek: int
+    pekerjaan_subjek: int
     npwp: Optional[str] = Field(default=None, max_length=50)
     no_telp_subjek: str = Field(max_length=30)
 
     jalan_subjek: str
     blok_kav_no_subjek: str
-    kelurahan_subjek: str
-    kecamatan_subjek: str
-    kabupaten_subjek: str
-    provinsi_subjek: str
+    kelurahan_subjek: int
+    kecamatan_subjek: int
+    kabupaten_subjek: int
+    provinsi_subjek: int
     rt_subjek: str
     rw_subjek: str
     kode_pos_subjek: str
 
-    jenis_tanah: str
+    jenis_tanah: int
     luas_tanah: int
 
     file_ktp: str
@@ -284,32 +284,32 @@ class RequestRecord(BaseModel):
     alamat_rumah_awal: str
     no_telp_awal: str
 
-    provinsi_op: str
-    kabupaten_op: str
-    kecamatan_op: str
-    kelurahan_op: str
+    provinsi_op: "RegionInfo"
+    kabupaten_op: "RegionInfo"
+    kecamatan_op: "RegionInfo"
+    kelurahan_op: "RegionInfo"
     blok_op: str
     no_urut_op: str
     kode_khusus: Optional[int] = None
 
     nama_lengkap: str
     nik: str
-    status_subjek: str
-    pekerjaan_subjek: str
+    status_subjek: "StatusInfo"
+    pekerjaan_subjek: "StatusInfo"
     npwp: Optional[str]
     no_telp_subjek: str
 
     jalan_subjek: str
     blok_kav_no_subjek: str
-    kelurahan_subjek: str
-    kecamatan_subjek: str
-    kabupaten_subjek: str
-    provinsi_subjek: str
+    kelurahan_subjek: "RegionInfo"
+    kecamatan_subjek: "RegionInfo"
+    kabupaten_subjek: "RegionInfo"
+    provinsi_subjek: "RegionInfo"
     rt_subjek: str
     rw_subjek: str
     kode_pos_subjek: str
 
-    jenis_tanah: str
+    jenis_tanah: "StatusInfo"
     luas_tanah: int
 
     file_ktp: str
@@ -364,22 +364,22 @@ class RequestUpdatePayload(BaseModel):
 
     nama_lengkap: Optional[str] = Field(default=None, max_length=255)
     nik: Optional[str] = Field(default=None, max_length=50)
-    status_subjek: Optional[str] = Field(default=None, max_length=100)
-    pekerjaan_subjek: Optional[str] = Field(default=None, max_length=100)
+    status_subjek: Optional[int] = None
+    pekerjaan_subjek: Optional[int] = None
     npwp: Optional[str] = Field(default=None, max_length=50)
     no_telp_subjek: Optional[str] = Field(default=None, max_length=30)
 
     jalan_subjek: Optional[str] = Field(default=None, max_length=255)
     blok_kav_no_subjek: Optional[str] = Field(default=None, max_length=100)
-    kelurahan_subjek: Optional[str] = Field(default=None, max_length=100)
-    kecamatan_subjek: Optional[str] = Field(default=None, max_length=100)
-    kabupaten_subjek: Optional[str] = Field(default=None, max_length=100)
-    provinsi_subjek: Optional[str] = Field(default=None, max_length=100)
+    kelurahan_subjek: Optional[int] = None
+    kecamatan_subjek: Optional[int] = None
+    kabupaten_subjek: Optional[int] = None
+    provinsi_subjek: Optional[int] = None
     rt_subjek: Optional[str] = Field(default=None, max_length=10)
     rw_subjek: Optional[str] = Field(default=None, max_length=10)
     kode_pos_subjek: Optional[str] = Field(default=None, max_length=20)
 
-    jenis_tanah: Optional[str] = Field(default=None, max_length=100)
+    jenis_tanah: Optional[int] = None
     luas_tanah: Optional[int] = None
 
     file_ktp: Optional[str] = Field(default=None, max_length=255)
@@ -416,3 +416,14 @@ class StaffUpdatePayload(BaseModel):
         if not data:
             raise ValueError("Tidak ada data yang diperbarui")
         return self
+
+
+class RegionInfo(BaseModel):
+    id: Optional[int] = None
+    kode: Optional[str] = None
+    nama: Optional[str] = None
+
+
+class StatusInfo(BaseModel):
+    id: Optional[int] = None
+    nama: Optional[str] = None

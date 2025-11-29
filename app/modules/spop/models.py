@@ -95,6 +95,26 @@ class RefKelurahanBaru(Base):
     kode_kelurahan: Mapped[int] = mapped_column(Integer, nullable=False)
     nama_kelurahan: Mapped[str] = mapped_column(String(120), nullable=False)
 
+class RefStatusSubjek(Base):
+    __tablename__ = "status_subjek"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nama: Mapped[str] = mapped_column(String(100), nullable=False)
+
+
+class RefPekerjaanSubjek(Base):
+    __tablename__ = "pekerjaan_subjek"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nama: Mapped[str] = mapped_column(String(100), nullable=False)
+
+
+class RefJenisTanah(Base):
+    __tablename__ = "jenis_tanah"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nama: Mapped[str] = mapped_column(String(100), nullable=False)
+
 
 class DatSubjekPajak(Base):
     __tablename__ = "dat_subjek_pajak"
@@ -139,24 +159,24 @@ class SpopRegistration(Base):
     # Data Subjek Pajak
     nama_lengkap: Mapped[str] = mapped_column(String(255), nullable=False)
     nik: Mapped[str] = mapped_column(String(50), nullable=False)
-    status_subjek: Mapped[str] = mapped_column(String(100), nullable=False)
-    pekerjaan_subjek: Mapped[str] = mapped_column(String(100), nullable=False)
+    status_subjek: Mapped[int] = mapped_column(Integer, nullable=False)
+    pekerjaan_subjek: Mapped[int] = mapped_column(Integer, nullable=False)
     npwp: Mapped[Optional[str]] = mapped_column(String(50))
     no_telp_subjek: Mapped[str] = mapped_column(String(30), nullable=False)
 
     # Alamat Subjek Pajak
     jalan_subjek: Mapped[str] = mapped_column(String(255), nullable=False)
     blok_kav_no_subjek: Mapped[str] = mapped_column(String(100), nullable=False)
-    kelurahan_subjek: Mapped[str] = mapped_column(String(100), nullable=False)
-    kecamatan_subjek: Mapped[str] = mapped_column(String(100), nullable=False)
-    kabupaten_subjek: Mapped[str] = mapped_column(String(100), nullable=False)
-    provinsi_subjek: Mapped[str] = mapped_column(String(100), nullable=False)
+    kelurahan_subjek: Mapped[int] = mapped_column(Integer, nullable=False)
+    kecamatan_subjek: Mapped[int] = mapped_column(Integer, nullable=False)
+    kabupaten_subjek: Mapped[int] = mapped_column(Integer, nullable=False)
+    provinsi_subjek: Mapped[int] = mapped_column(Integer, nullable=False)
     rt_subjek: Mapped[str] = mapped_column(String(10), nullable=False)
     rw_subjek: Mapped[str] = mapped_column(String(10), nullable=False)
     kode_pos_subjek: Mapped[str] = mapped_column(String(20), nullable=False)
 
     # Data Objek Pajak
-    jenis_tanah: Mapped[str] = mapped_column(String(100), nullable=False)
+    jenis_tanah: Mapped[int] = mapped_column(Integer, nullable=False)
     luas_tanah: Mapped[int] = mapped_column(BigInteger, nullable=False)
 
     # Upload Berkas
@@ -193,4 +213,7 @@ __all__ = [
     "RefDati2",
     "RefKecamatan",
     "RefKelurahan",
+    "RefStatusSubjek",
+    "RefPekerjaanSubjek",
+    "RefJenisTanah",
 ]
