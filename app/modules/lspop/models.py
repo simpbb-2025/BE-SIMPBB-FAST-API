@@ -21,8 +21,8 @@ class LampiranSpop(Base):
     bangunan_ke: Mapped[Optional[int]] = mapped_column(Integer)
 
     # Rincian Data Bangunan
-    jenis_penggunaan_bangunan: Mapped[Optional[str]] = mapped_column(String(100))
-    kondisi_bangunan: Mapped[Optional[str]] = mapped_column(String(100))
+    jenis_penggunaan_bangunan: Mapped[Optional[int]] = mapped_column(Integer)
+    kondisi_bangunan: Mapped[Optional[int]] = mapped_column(Integer)
     tahun_dibangun: Mapped[Optional[int]] = mapped_column(Integer)
     tahun_direnovasi: Mapped[Optional[int]] = mapped_column(Integer)
     luas_bangunan_m2: Mapped[Optional[int]] = mapped_column(Integer)
@@ -30,10 +30,10 @@ class LampiranSpop(Base):
     daya_listrik_watt: Mapped[Optional[int]] = mapped_column(Integer)
 
     # Konstruksi
-    jenis_konstruksi: Mapped[Optional[str]] = mapped_column(String(100))
-    jenis_atap: Mapped[Optional[str]] = mapped_column(String(100))
-    jenis_lantai: Mapped[Optional[str]] = mapped_column(String(100))
-    jenis_langit_langit: Mapped[Optional[str]] = mapped_column(String(100))
+    jenis_konstruksi: Mapped[Optional[int]] = mapped_column(Integer)
+    jenis_atap: Mapped[Optional[int]] = mapped_column(Integer)
+    jenis_lantai: Mapped[Optional[int]] = mapped_column(Integer)
+    jenis_langit_langit: Mapped[Optional[int]] = mapped_column(Integer)
 
     # Fasilitas AC
     jumlah_ac: Mapped[Optional[int]] = mapped_column(Integer)
@@ -78,44 +78,141 @@ class LampiranSpop(Base):
     kedalaman_sumur_artesis_meter: Mapped[Optional[int]] = mapped_column(Integer)
 
     # Perkantoran / Gedung Pemerintah (JPB 2/9)
-    kelas_bangunan_perkantoran: Mapped[Optional[str]] = mapped_column(String(100))
+    kelas_bangunan_perkantoran: Mapped[Optional[int]] = mapped_column(Integer)
 
     # Toko / Apotik / Pasar / Ruko (JPB 4)
-    kelas_bangunan_ruko: Mapped[Optional[str]] = mapped_column(String(100))
+    kelas_bangunan_ruko: Mapped[Optional[int]] = mapped_column(Integer)
 
     # Rumah Sakit / Klinik (JPB 6)
-    kelas_bangunan_rumah_sakit: Mapped[Optional[str]] = mapped_column(String(100))
+    kelas_bangunan_rumah_sakit: Mapped[Optional[int]] = mapped_column(Integer)
     luas_ruang_kamar_ac_sentral_m2: Mapped[Optional[int]] = mapped_column(Integer)
     luas_ruang_lain_ac_sentral_m2: Mapped[Optional[int]] = mapped_column(Integer)
 
     # Olahraga / Rekreasi (JPB 6)
-    kelas_bangunan_olahraga: Mapped[Optional[str]] = mapped_column(String(100))
+    kelas_bangunan_olahraga: Mapped[Optional[int]] = mapped_column(Integer)
 
     # Hotel (JPB 6)
-    jenis_hotel: Mapped[Optional[str]] = mapped_column(String(100))
-    bintang_hotel: Mapped[Optional[str]] = mapped_column(String(50))
+    jenis_hotel: Mapped[Optional[int]] = mapped_column(Integer)
+    bintang_hotel: Mapped[Optional[int]] = mapped_column(Integer)
     jumlah_kamar_hotel: Mapped[Optional[int]] = mapped_column(Integer)
     luas_ruang_kamar_hotel_ac_sentral_m2: Mapped[Optional[int]] = mapped_column(Integer)
     luas_ruang_lain_hotel_ac_sentral_m2: Mapped[Optional[int]] = mapped_column(Integer)
 
     # Bangunan Parkir (JPB 12)
-    kelas_bangunan_parkir: Mapped[Optional[str]] = mapped_column(String(100))
+    kelas_bangunan_parkir: Mapped[Optional[int]] = mapped_column(Integer)
 
     # Apartemen (JPB 13)
-    kelas_bangunan_apartemen: Mapped[Optional[str]] = mapped_column(String(100))
+    kelas_bangunan_apartemen: Mapped[Optional[int]] = mapped_column(Integer)
     jumlah_kamar_apartemen: Mapped[Optional[int]] = mapped_column(Integer)
 
     # Tangki Minyak (JPB 15)
-    letak_tangki_minyak: Mapped[Optional[str]] = mapped_column(String(100))
+    letak_tangki_minyak: Mapped[Optional[int]] = mapped_column(Integer)
     kapasitas_tangki_minyak_liter: Mapped[Optional[int]] = mapped_column(Integer)
 
     # Gedung Sekolah (JPB 16)
-    kelas_bangunan_sekolah: Mapped[Optional[str]] = mapped_column(String(100))
+    kelas_bangunan_sekolah: Mapped[Optional[int]] = mapped_column(Integer)
 
     # Berkas
     foto_objek_pajak: Mapped[Optional[str]] = mapped_column(String(255))
 
     submitted_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+
+
+# Reference tables for relational fields (id, nama)
+class RefJenisPenggunaanBangunan(Base):
+    __tablename__ = "jenis_penggunaan_bangunan"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nama: Mapped[str] = mapped_column(String(100), nullable=False)
+
+
+class RefKondisiBangunan(Base):
+    __tablename__ = "kondisi_bangunan"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nama: Mapped[str] = mapped_column(String(100), nullable=False)
+
+
+class RefJenisKonstruksi(Base):
+    __tablename__ = "jenis_konstruksi"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nama: Mapped[str] = mapped_column(String(100), nullable=False)
+
+
+class RefJenisAtap(Base):
+    __tablename__ = "jenis_atap"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nama: Mapped[str] = mapped_column(String(100), nullable=False)
+
+
+class RefJenisLantai(Base):
+    __tablename__ = "jenis_lantai"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nama: Mapped[str] = mapped_column(String(100), nullable=False)
+
+
+class RefJenisLangitLangit(Base):
+    __tablename__ = "jenis_langit_langit"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nama: Mapped[str] = mapped_column(String(100), nullable=False)
+
+
+class RefKelasBangunanPerkantoran(Base):
+    __tablename__ = "kelas_bangunan_perkantoran"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nama: Mapped[str] = mapped_column(String(100), nullable=False)
+
+
+class RefKelasBangunanRuko(Base):
+    __tablename__ = "kelas_bangunan_ruko"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nama: Mapped[str] = mapped_column(String(100), nullable=False)
+
+
+class RefKelasBangunanRumahSakit(Base):
+    __tablename__ = "kelas_bangunan_rumah_sakit"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nama: Mapped[str] = mapped_column(String(100), nullable=False)
+
+
+class RefKelasBangunanOlahraga(Base):
+    __tablename__ = "kelas_bangunan_olahraga"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nama: Mapped[str] = mapped_column(String(100), nullable=False)
+
+
+class RefJenisHotel(Base):
+    __tablename__ = "jenis_hotel"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nama: Mapped[str] = mapped_column(String(100), nullable=False)
+
+
+class RefBintangHotel(Base):
+    __tablename__ = "bintang_hotel"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nama: Mapped[str] = mapped_column(String(100), nullable=False)
+
+
+class RefKelasBangunanParkir(Base):
+    __tablename__ = "kelas_bangunan_parkir"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nama: Mapped[str] = mapped_column(String(100), nullable=False)
+
+
+class RefKelasBangunanApartemen(Base):
+    __tablename__ = "kelas_bangunan_apartemen"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nama: Mapped[str] = mapped_column(String(100), nullable=False)
+
+
+class RefKelasBangunanSekolah(Base):
+    __tablename__ = "kelas_bangunan_sekolah"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nama: Mapped[str] = mapped_column(String(100), nullable=False)
+
+
+class RefLetakTangkiMinyak(Base):
+    __tablename__ = "letak_tangki_minyak"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nama: Mapped[str] = mapped_column(String(100), nullable=False)
 
 
 __all__ = ["LampiranSpop"]

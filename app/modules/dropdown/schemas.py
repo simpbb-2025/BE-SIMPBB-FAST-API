@@ -24,3 +24,24 @@ class DropdownResponse(BaseModel):
     status_subjek: List[DropdownSimple]
     pekerjaan_subjek: List[DropdownSimple]
     jenis_tanah: List[DropdownSimple]
+
+
+class LspopDropdownResponse(BaseModel):
+    success: bool = True
+    message: str
+    jenis_penggunaan_bangunan: List[DropdownSimple]
+    kondisi_bangunan: List[DropdownSimple]
+    jenis_konstruksi: List[DropdownSimple]
+    jenis_atap: List[DropdownSimple]
+    jenis_lantai: List[DropdownSimple]
+    jenis_langit_langit: List[DropdownSimple]
+    kelas_bangunan_perkantoran: List[DropdownSimple]
+    kelas_bangunan_ruko: List[DropdownSimple]
+    kelas_bangunan_rumah_sakit: List[DropdownSimple]
+    kelas_bangunan_olahraga: List[DropdownSimple]
+    jenis_hotel: List[DropdownSimple]
+    bintang_hotel: List[DropdownSimple]
+    kelas_bangunan_parkir: List[DropdownSimple]
+    kelas_bangunan_apartemen: List[DropdownSimple]
+    kelas_bangunan_sekolah: List[DropdownSimple]
+    letak_tangki_minyak: List[DropdownSimple]

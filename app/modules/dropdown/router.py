@@ -12,6 +12,24 @@ from app.modules.spop.models import (
     RefProvinsi,
     RefStatusSubjek,
 )
+from app.modules.lspop.models import (
+    RefJenisPenggunaanBangunan,
+    RefKondisiBangunan,
+    RefJenisKonstruksi,
+    RefJenisAtap,
+    RefJenisLantai,
+    RefJenisLangitLangit,
+    RefKelasBangunanPerkantoran,
+    RefKelasBangunanRuko,
+    RefKelasBangunanRumahSakit,
+    RefKelasBangunanOlahraga,
+    RefJenisHotel,
+    RefBintangHotel,
+    RefKelasBangunanParkir,
+    RefKelasBangunanApartemen,
+    RefKelasBangunanSekolah,
+    RefLetakTangkiMinyak,
+)
 
 
 router = APIRouter(prefix="/dropdown", tags=["dropdown"])
@@ -48,4 +66,51 @@ async def dropdown_spop(session: SessionDep) -> schemas.DropdownResponse:
         status_subjek=status,
         pekerjaan_subjek=kerja,
         jenis_tanah=tanah,
+    )
+
+
+@router.get("/lspop", response_model=schemas.LspopDropdownResponse)
+async def dropdown_lspop(session: SessionDep) -> schemas.LspopDropdownResponse:
+    def fetch(model):
+        rows = session.execute(select(model.id, model.nama))
+        return rows
+
+    jenis_penggunaan = await session.execute(select(RefJenisPenggunaanBangunan.id, RefJenisPenggunaanBangunan.nama))
+    kondisi = await session.execute(select(RefKondisiBangunan.id, RefKondisiBangunan.nama))
+    konstruksi = await session.execute(select(RefJenisKonstruksi.id, RefJenisKonstruksi.nama))
+    atap = await session.execute(select(RefJenisAtap.id, RefJenisAtap.nama))
+    lantai = await session.execute(select(RefJenisLantai.id, RefJenisLantai.nama))
+    langit = await session.execute(select(RefJenisLangitLangit.id, RefJenisLangitLangit.nama))
+    kelas_perkantoran = await session.execute(select(RefKelasBangunanPerkantoran.id, RefKelasBangunanPerkantoran.nama))
+    kelas_ruko = await session.execute(select(RefKelasBangunanRuko.id, RefKelasBangunanRuko.nama))
+    kelas_rs = await session.execute(select(RefKelasBangunanRumahSakit.id, RefKelasBangunanRumahSakit.nama))
+    kelas_olahraga = await session.execute(select(RefKelasBangunanOlahraga.id, RefKelasBangunanOlahraga.nama))
+    jenis_hot = await session.execute(select(RefJenisHotel.id, RefJenisHotel.nama))
+    bintang_hot = await session.execute(select(RefBintangHotel.id, RefBintangHotel.nama))
+    kelas_parkir = await session.execute(select(RefKelasBangunanParkir.id, RefKelasBangunanParkir.nama))
+    kelas_apart = await session.execute(select(RefKelasBangunanApartemen.id, RefKelasBangunanApartemen.nama))
+    kelas_sekolah = await session.execute(select(RefKelasBangunanSekolah.id, RefKelasBangunanSekolah.nama))
+    letak_tangki = await session.execute(select(RefLetakTangkiMinyak.id, RefLetakTangkiMinyak.nama))
+
+    def to_simple(rows):
+        return [schemas.DropdownSimple(id=row.id, nama=row.nama) for row in rows]
+
+    return schemas.LspopDropdownResponse(
+        message="Data dropdown LSPOP berhasil diambil",
+        jenis_penggunaan_bangunan=to_simple(jenis_penggunaan),
+        kondisi_bangunan=to_simple(kondisi),
+        jenis_konstruksi=to_simple(konstruksi),
+        jenis_atap=to_simple(atap),
+        jenis_lantai=to_simple(lantai),
+        jenis_langit_langit=to_simple(langit),
+        kelas_bangunan_perkantoran=to_simple(kelas_perkantoran),
+        kelas_bangunan_ruko=to_simple(kelas_ruko),
+        kelas_bangunan_rumah_sakit=to_simple(kelas_rs),
+        kelas_bangunan_olahraga=to_simple(kelas_olahraga),
+        jenis_hotel=to_simple(jenis_hot),
+        bintang_hotel=to_simple(bintang_hot),
+        kelas_bangunan_parkir=to_simple(kelas_parkir),
+        kelas_bangunan_apartemen=to_simple(kelas_apart),
+        kelas_bangunan_sekolah=to_simple(kelas_sekolah),
+        letak_tangki_minyak=to_simple(letak_tangki),
     )

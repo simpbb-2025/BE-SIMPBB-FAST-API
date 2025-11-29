@@ -8,29 +8,54 @@ from sqlalchemy import func, select
 
 from app.core.deps import CurrentUserDep, SessionDep
 from app.modules.lspop import schemas
-from app.modules.lspop.models import LampiranSpop
+from app.modules.lspop.models import (
+    LampiranSpop,
+    RefJenisPenggunaanBangunan,
+    RefKondisiBangunan,
+    RefJenisKonstruksi,
+    RefJenisAtap,
+    RefJenisLantai,
+    RefJenisLangitLangit,
+    RefKelasBangunanPerkantoran,
+    RefKelasBangunanRuko,
+    RefKelasBangunanRumahSakit,
+    RefKelasBangunanOlahraga,
+    RefJenisHotel,
+    RefBintangHotel,
+    RefKelasBangunanParkir,
+    RefKelasBangunanApartemen,
+    RefKelasBangunanSekolah,
+    RefLetakTangkiMinyak,
+)
+from app.modules.spop.models import SpopRegistration
 
 router = APIRouter(prefix="/lspop", tags=["lspop"])
 
 
-def _to_record(row: LampiranSpop) -> schemas.LampiranRecord:
+def _to_record(row: LampiranSpop, lookups: Optional[dict] = None) -> schemas.LampiranRecord:
+    lookups = lookups or {}
+    def info(field: str, value: Optional[int]) -> Optional[schemas.StatusInfo]:
+        if value is None:
+            return None
+        return schemas.StatusInfo(id=value, nama=lookups.get(field, {}).get(value, ""))
+
     return schemas.LampiranRecord(
         id=row.id,
         submitted_at=row.submitted_at,
         nop=row.nop,
         jumlah_bangunan=row.jumlah_bangunan,
         bangunan_ke=row.bangunan_ke,
-        jenis_penggunaan_bangunan=row.jenis_penggunaan_bangunan,
-        kondisi_bangunan=row.kondisi_bangunan,
+        jenis_penggunaan_bangunan=info("jenis_penggunaan_bangunan", row.jenis_penggunaan_bangunan),
+        kondisi_bangunan=info("kondisi_bangunan", row.kondisi_bangunan),
         tahun_dibangun=row.tahun_dibangun,
         tahun_direnovasi=row.tahun_direnovasi,
         luas_bangunan_m2=row.luas_bangunan_m2,
         jumlah_lantai=row.jumlah_lantai,
         daya_listrik_watt=row.daya_listrik_watt,
-        jenis_konstruksi=row.jenis_konstruksi,
-        jenis_atap=row.jenis_atap,
-        jenis_lantai=row.jenis_lantai,
-        jenis_langit_langit=row.jenis_langit_langit,
+        jenis_konstruksi=info("jenis_konstruksi", row.jenis_konstruksi),
+        jenis_atap=info("jenis_atap", row.jenis_atap),
+        jenis_lantai=info("jenis_lantai", row.jenis_lantai),
+        jenis_langit_langit=info("jenis_langit_langit", row.jenis_langit_langit),
         jumlah_ac=row.jumlah_ac,
         jumlah_ac_split=row.jumlah_ac_split,
         jumlah_ac_window=row.jumlah_ac_window,
@@ -56,25 +81,71 @@ def _to_record(row: LampiranSpop) -> schemas.LampiranRecord:
         pemadam_sprinkler=row.pemadam_sprinkler,
         pemadam_fire_alarm=row.pemadam_fire_alarm,
         kedalaman_sumur_artesis_meter=row.kedalaman_sumur_artesis_meter,
-        kelas_bangunan_perkantoran=row.kelas_bangunan_perkantoran,
-        kelas_bangunan_ruko=row.kelas_bangunan_ruko,
-        kelas_bangunan_rumah_sakit=row.kelas_bangunan_rumah_sakit,
+        kelas_bangunan_perkantoran=info("kelas_bangunan_perkantoran", row.kelas_bangunan_perkantoran),
+        kelas_bangunan_ruko=info("kelas_bangunan_ruko", row.kelas_bangunan_ruko),
+        kelas_bangunan_rumah_sakit=info("kelas_bangunan_rumah_sakit", row.kelas_bangunan_rumah_sakit),
         luas_ruang_kamar_ac_sentral_m2=row.luas_ruang_kamar_ac_sentral_m2,
         luas_ruang_lain_ac_sentral_m2=row.luas_ruang_lain_ac_sentral_m2,
-        kelas_bangunan_olahraga=row.kelas_bangunan_olahraga,
-        jenis_hotel=row.jenis_hotel,
-        bintang_hotel=row.bintang_hotel,
+        kelas_bangunan_olahraga=info("kelas_bangunan_olahraga", row.kelas_bangunan_olahraga),
+        jenis_hotel=info("jenis_hotel", row.jenis_hotel),
+        bintang_hotel=info("bintang_hotel", row.bintang_hotel),
         jumlah_kamar_hotel=row.jumlah_kamar_hotel,
         luas_ruang_kamar_hotel_ac_sentral_m2=row.luas_ruang_kamar_hotel_ac_sentral_m2,
         luas_ruang_lain_hotel_ac_sentral_m2=row.luas_ruang_lain_hotel_ac_sentral_m2,
-        kelas_bangunan_parkir=row.kelas_bangunan_parkir,
-        kelas_bangunan_apartemen=row.kelas_bangunan_apartemen,
+        kelas_bangunan_parkir=info("kelas_bangunan_parkir", row.kelas_bangunan_parkir),
+        kelas_bangunan_apartemen=info("kelas_bangunan_apartemen", row.kelas_bangunan_apartemen),
         jumlah_kamar_apartemen=row.jumlah_kamar_apartemen,
-        letak_tangki_minyak=row.letak_tangki_minyak,
+        letak_tangki_minyak=info("letak_tangki_minyak", row.letak_tangki_minyak),
         kapasitas_tangki_minyak_liter=row.kapasitas_tangki_minyak_liter,
-        kelas_bangunan_sekolah=row.kelas_bangunan_sekolah,
+        kelas_bangunan_sekolah=info("kelas_bangunan_sekolah", row.kelas_bangunan_sekolah),
         foto_objek_pajak=row.foto_objek_pajak,
     )
+
+
+async def _build_lookups(session: SessionDep, rows: List[LampiranSpop]) -> dict:
+    fields_models = {
+        "jenis_penggunaan_bangunan": RefJenisPenggunaanBangunan,
+        "kondisi_bangunan": RefKondisiBangunan,
+        "jenis_konstruksi": RefJenisKonstruksi,
+        "jenis_atap": RefJenisAtap,
+        "jenis_lantai": RefJenisLantai,
+        "jenis_langit_langit": RefJenisLangitLangit,
+        "kelas_bangunan_perkantoran": RefKelasBangunanPerkantoran,
+        "kelas_bangunan_ruko": RefKelasBangunanRuko,
+        "kelas_bangunan_rumah_sakit": RefKelasBangunanRumahSakit,
+        "kelas_bangunan_olahraga": RefKelasBangunanOlahraga,
+        "jenis_hotel": RefJenisHotel,
+        "bintang_hotel": RefBintangHotel,
+        "kelas_bangunan_parkir": RefKelasBangunanParkir,
+        "kelas_bangunan_apartemen": RefKelasBangunanApartemen,
+        "kelas_bangunan_sekolah": RefKelasBangunanSekolah,
+        "letak_tangki_minyak": RefLetakTangkiMinyak,
+    }
+
+    id_sets: dict = {field: set() for field in fields_models}
+    for row in rows:
+        for field in fields_models:
+            val = getattr(row, field, None)
+            if val is not None:
+                id_sets[field].add(val)
+
+    lookups: dict = {}
+    for field, model in fields_models.items():
+        ids = id_sets[field]
+        if not ids:
+            lookups[field] = {}
+            continue
+        rows_db = await session.execute(select(model.id, model.nama).where(model.id.in_(ids)))
+        lookups[field] = {r.id: r.nama for r in rows_db}
+    return lookups
+
+
+async def _ensure_nop_exists(session: SessionDep, nop: str) -> None:
+    if not nop:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="NOP wajib diisi")
+    exists = await session.execute(select(SpopRegistration.id).where(SpopRegistration.nop == nop).limit(1))
+    if exists.scalar_one_or_none() is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="NOP tidak ditemukan di SPOP")
 
 
 async def _load_payload(request: Request, model_cls):
@@ -95,6 +166,7 @@ async def create_lspop(
     current_user: CurrentUserDep,
 ) -> schemas.LampiranResponse:
     payload = await _load_payload(request, schemas.LampiranCreatePayload)
+    await _ensure_nop_exists(session, payload.nop)
     entity = LampiranSpop(id=uuid4().hex)
     data = payload.model_dump(exclude_unset=True)
     for key, value in data.items():
@@ -105,7 +177,8 @@ async def create_lspop(
     session.add(entity)
     await session.commit()
     await session.refresh(entity)
-    record = _to_record(entity)
+    lookups = await _build_lookups(session, [entity])
+    record = _to_record(entity, lookups)
     return schemas.LampiranResponse(message="Lampiran SPOP berhasil dibuat", data=record)
 
 
@@ -130,7 +203,8 @@ async def list_lspop(
     result = await session.execute(stmt.offset(offset).limit(limit))
     rows = result.scalars().all()
 
-    data: List[schemas.LampiranRecord] = [_to_record(row) for row in rows]
+    lookups = await _build_lookups(session, rows)
+    data: List[schemas.LampiranRecord] = [_to_record(row, lookups) for row in rows]
     pages = (total + limit - 1) // limit if total else 0
     meta = schemas.Pagination(
         total=total,
@@ -152,7 +226,8 @@ async def get_lspop(
     entity = await session.get(LampiranSpop, lampiran_id)
     if entity is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lampiran tidak ditemukan")
-    record = _to_record(entity)
+    lookups = await _build_lookups(session, [entity])
+    record = _to_record(entity, lookups)
     return schemas.LampiranResponse(message="Detail lampiran SPOP berhasil diambil", data=record)
 
 
@@ -178,7 +253,8 @@ async def update_lspop(
 
     await session.commit()
     await session.refresh(entity)
-    record = _to_record(entity)
+    lookups = await _build_lookups(session, [entity])
+    record = _to_record(entity, lookups)
     return schemas.LampiranResponse(message="Lampiran SPOP berhasil diperbarui", data=record)
 
 

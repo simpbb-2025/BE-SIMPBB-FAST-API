@@ -11,18 +11,18 @@ class LampiranCreatePayload(BaseModel):
     jumlah_bangunan: Optional[int] = None
     bangunan_ke: Optional[int] = None
 
-    jenis_penggunaan_bangunan: Optional[str] = Field(default=None, max_length=100)
-    kondisi_bangunan: Optional[str] = Field(default=None, max_length=100)
+    jenis_penggunaan_bangunan: Optional[int] = None
+    kondisi_bangunan: Optional[int] = None
     tahun_dibangun: Optional[int] = None
     tahun_direnovasi: Optional[int] = None
     luas_bangunan_m2: Optional[int] = None
     jumlah_lantai: Optional[int] = None
     daya_listrik_watt: Optional[int] = None
 
-    jenis_konstruksi: Optional[str] = Field(default=None, max_length=100)
-    jenis_atap: Optional[str] = Field(default=None, max_length=100)
-    jenis_lantai: Optional[str] = Field(default=None, max_length=100)
-    jenis_langit_langit: Optional[str] = Field(default=None, max_length=100)
+    jenis_konstruksi: Optional[int] = None
+    jenis_atap: Optional[int] = None
+    jenis_lantai: Optional[int] = None
+    jenis_langit_langit: Optional[int] = None
 
     jumlah_ac: Optional[int] = None
     jumlah_ac_split: Optional[int] = None
@@ -58,29 +58,29 @@ class LampiranCreatePayload(BaseModel):
 
     kedalaman_sumur_artesis_meter: Optional[int] = None
 
-    kelas_bangunan_perkantoran: Optional[str] = Field(default=None, max_length=100)
-    kelas_bangunan_ruko: Optional[str] = Field(default=None, max_length=100)
-    kelas_bangunan_rumah_sakit: Optional[str] = Field(default=None, max_length=100)
+    kelas_bangunan_perkantoran: Optional[int] = None
+    kelas_bangunan_ruko: Optional[int] = None
+    kelas_bangunan_rumah_sakit: Optional[int] = None
     luas_ruang_kamar_ac_sentral_m2: Optional[int] = None
     luas_ruang_lain_ac_sentral_m2: Optional[int] = None
 
-    kelas_bangunan_olahraga: Optional[str] = Field(default=None, max_length=100)
+    kelas_bangunan_olahraga: Optional[int] = None
 
-    jenis_hotel: Optional[str] = Field(default=None, max_length=100)
-    bintang_hotel: Optional[str] = Field(default=None, max_length=50)
+    jenis_hotel: Optional[int] = None
+    bintang_hotel: Optional[int] = None
     jumlah_kamar_hotel: Optional[int] = None
     luas_ruang_kamar_hotel_ac_sentral_m2: Optional[int] = None
     luas_ruang_lain_hotel_ac_sentral_m2: Optional[int] = None
 
-    kelas_bangunan_parkir: Optional[str] = Field(default=None, max_length=100)
+    kelas_bangunan_parkir: Optional[int] = None
 
-    kelas_bangunan_apartemen: Optional[str] = Field(default=None, max_length=100)
+    kelas_bangunan_apartemen: Optional[int] = None
     jumlah_kamar_apartemen: Optional[int] = None
 
-    letak_tangki_minyak: Optional[str] = Field(default=None, max_length=100)
+    letak_tangki_minyak: Optional[int] = None
     kapasitas_tangki_minyak_liter: Optional[int] = None
 
-    kelas_bangunan_sekolah: Optional[str] = Field(default=None, max_length=100)
+    kelas_bangunan_sekolah: Optional[int] = None
 
     foto_objek_pajak: Optional[str] = Field(default=None, max_length=255)
 
@@ -102,18 +102,18 @@ class LampiranRecord(BaseModel):
     jumlah_bangunan: Optional[int] = None
     bangunan_ke: Optional[int] = None
 
-    jenis_penggunaan_bangunan: Optional[str] = None
-    kondisi_bangunan: Optional[str] = None
+    jenis_penggunaan_bangunan: Optional["StatusInfo"] = None
+    kondisi_bangunan: Optional["StatusInfo"] = None
     tahun_dibangun: Optional[int] = None
     tahun_direnovasi: Optional[int] = None
     luas_bangunan_m2: Optional[int] = None
     jumlah_lantai: Optional[int] = None
     daya_listrik_watt: Optional[int] = None
 
-    jenis_konstruksi: Optional[str] = None
-    jenis_atap: Optional[str] = None
-    jenis_lantai: Optional[str] = None
-    jenis_langit_langit: Optional[str] = None
+    jenis_konstruksi: Optional["StatusInfo"] = None
+    jenis_atap: Optional["StatusInfo"] = None
+    jenis_lantai: Optional["StatusInfo"] = None
+    jenis_langit_langit: Optional["StatusInfo"] = None
 
     jumlah_ac: Optional[int] = None
     jumlah_ac_split: Optional[int] = None
@@ -149,29 +149,29 @@ class LampiranRecord(BaseModel):
 
     kedalaman_sumur_artesis_meter: Optional[int] = None
 
-    kelas_bangunan_perkantoran: Optional[str] = None
-    kelas_bangunan_ruko: Optional[str] = None
-    kelas_bangunan_rumah_sakit: Optional[str] = None
+    kelas_bangunan_perkantoran: Optional["StatusInfo"] = None
+    kelas_bangunan_ruko: Optional["StatusInfo"] = None
+    kelas_bangunan_rumah_sakit: Optional["StatusInfo"] = None
     luas_ruang_kamar_ac_sentral_m2: Optional[int] = None
     luas_ruang_lain_ac_sentral_m2: Optional[int] = None
 
-    kelas_bangunan_olahraga: Optional[str] = None
+    kelas_bangunan_olahraga: Optional["StatusInfo"] = None
 
-    jenis_hotel: Optional[str] = None
-    bintang_hotel: Optional[str] = None
+    jenis_hotel: Optional["StatusInfo"] = None
+    bintang_hotel: Optional["StatusInfo"] = None
     jumlah_kamar_hotel: Optional[int] = None
     luas_ruang_kamar_hotel_ac_sentral_m2: Optional[int] = None
     luas_ruang_lain_hotel_ac_sentral_m2: Optional[int] = None
 
-    kelas_bangunan_parkir: Optional[str] = None
+    kelas_bangunan_parkir: Optional["StatusInfo"] = None
 
-    kelas_bangunan_apartemen: Optional[str] = None
+    kelas_bangunan_apartemen: Optional["StatusInfo"] = None
     jumlah_kamar_apartemen: Optional[int] = None
 
-    letak_tangki_minyak: Optional[str] = None
+    letak_tangki_minyak: Optional["StatusInfo"] = None
     kapasitas_tangki_minyak_liter: Optional[int] = None
 
-    kelas_bangunan_sekolah: Optional[str] = None
+    kelas_bangunan_sekolah: Optional["StatusInfo"] = None
 
     foto_objek_pajak: Optional[str] = None
 
@@ -201,3 +201,8 @@ class LampiranListResponse(BaseModel):
 class LampiranDeleteResponse(BaseModel):
     success: bool = True
     message: str
+
+
+class StatusInfo(BaseModel):
+    id: Optional[int] = None
+    nama: Optional[str] = None
