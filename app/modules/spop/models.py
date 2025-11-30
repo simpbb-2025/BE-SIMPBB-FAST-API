@@ -56,6 +56,9 @@ class Spop(Base):
     nm_pemeriksaan_op: Mapped[Optional[str]] = mapped_column("NM_PEMERIKSAAN_OP", String(30))
     nip_pemeriksa_op: Mapped[Optional[str]] = mapped_column("NIP_PEMERIKSA_OP", String(20))
     no_persil: Mapped[Optional[str]] = mapped_column("NO_PERSIL", String(5))
+    user_id: Mapped[Optional[str]] = mapped_column("USER_ID", String(32))
+    kelas_bangunan_njop: Mapped[Optional[int]] = mapped_column("KELAS_BANGUNAN_NJOP", Integer)
+    kelas_bumi_njop: Mapped[Optional[int]] = mapped_column("KELAS_BUMI_NJOP", Integer)
 
 
 class RefProvinsi(Base):
@@ -114,6 +117,22 @@ class RefJenisTanah(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     nama: Mapped[str] = mapped_column(String(100), nullable=False)
+
+
+class RefKelasBangunanNjop(Base):
+    __tablename__ = "kelas_bangunan_njop"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    kelas: Mapped[str] = mapped_column(String(20), nullable=False)
+    njop: Mapped[int] = mapped_column(BigInteger, nullable=False)
+
+
+class RefKelasBumiNjop(Base):
+    __tablename__ = "kelas_bumi_njop"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    kelas: Mapped[str] = mapped_column(String(20), nullable=False)
+    njop: Mapped[int] = mapped_column(BigInteger, nullable=False)
 
 
 class DatSubjekPajak(Base):
@@ -192,6 +211,9 @@ class SpopRegistration(Base):
     # Petugas (diisi melalui endpoint staff)
     nama_petugas: Mapped[Optional[str]] = mapped_column(String(255))
     nip: Mapped[Optional[str]] = mapped_column(String(50))
+    user_id: Mapped[Optional[str]] = mapped_column(String(32))
+    kelas_bangunan_njop: Mapped[Optional[int]] = mapped_column(Integer)
+    kelas_bumi_njop: Mapped[Optional[int]] = mapped_column(Integer)
 
     # Status & keterangan
     status: Mapped[Optional[str]] = mapped_column("status_akhir", String(50))
@@ -216,4 +238,6 @@ __all__ = [
     "RefStatusSubjek",
     "RefPekerjaanSubjek",
     "RefJenisTanah",
+    "RefKelasBangunanNjop",
+    "RefKelasBumiNjop",
 ]

@@ -14,6 +14,15 @@ class DropdownSimple(BaseModel):
     nama: str
 
 
+class DropdownBasicResponse(BaseModel):
+    success: bool = True
+    message: str
+    provinsi_subjek: List[DropdownRegion]
+    kabupaten_kota_subjek: List[DropdownRegion]
+    kecamatan_subjek: List[DropdownRegion]
+    kelurahan_desa_subjek: List[DropdownRegion]
+
+
 class DropdownResponse(BaseModel):
     success: bool = True
     message: str

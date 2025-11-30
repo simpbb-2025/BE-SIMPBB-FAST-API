@@ -59,6 +59,8 @@ class SpopBasePayload(BaseModel):
     kd_znt: Optional[str] = None
     jns_bumi: str = Field(min_length=1, max_length=1)
     nilai_sistem_bumi: int
+    kelas_bangunan_njop: Optional[int] = None
+    kelas_bumi_njop: Optional[int] = None
     tgl_pendataan_op: date
     nm_pendataan_op: Optional[str] = None
     nip_pendata: Optional[str] = None
@@ -150,6 +152,12 @@ class SubjekPajakInfo(BaseModel):
     email: Optional[str]
 
 
+class NjopClass(BaseModel):
+    id: Optional[int] = None
+    kelas: Optional[int] = None
+    njop: Optional[int] = None
+
+
 class SpopDetail(BaseModel):
     nop: str
     kd_propinsi: str
@@ -173,6 +181,8 @@ class SpopDetail(BaseModel):
     kd_znt: Optional[str]
     jns_bumi: str
     nilai_sistem_bumi: int
+    kelas_bangunan_njop: Optional[NjopClass] = None
+    kelas_bumi_njop: Optional[NjopClass] = None
     tgl_pendataan_op: date
     nm_pendataan_op: Optional[str]
     nip_pendata: Optional[str]
@@ -256,6 +266,8 @@ class RequestCreatePayload(BaseModel):
 
     jenis_tanah: int
     luas_tanah: int
+    kelas_bangunan_njop: Optional[int] = None
+    kelas_bumi_njop: Optional[int] = None
 
     file_ktp: str
     file_sertifikat: str
@@ -265,6 +277,7 @@ class RequestCreatePayload(BaseModel):
     file_pendukung: Optional[str] = None
     status: Optional[str] = None
     keterangan: Optional[str] = None
+    user_id: Optional[str] = None
 
     @model_validator(mode="after")
     def ensure_region_ids(self) -> "RequestCreatePayload":
@@ -311,6 +324,8 @@ class RequestRecord(BaseModel):
 
     jenis_tanah: "StatusInfo"
     luas_tanah: int
+    kelas_bangunan_njop: Optional["NjopClass"] = None
+    kelas_bumi_njop: Optional["NjopClass"] = None
 
     file_ktp: str
     file_sertifikat: str
@@ -318,6 +333,7 @@ class RequestRecord(BaseModel):
     file_foto_objek: str
     file_surat_kuasa: Optional[str] = None
     file_pendukung: Optional[str] = None
+    user_id: Optional[str] = None
     tanggal_pelaksanaan: Optional[datetime] = None
     foto_objek_pajak: Optional[str] = None
     nama_petugas: Optional[str] = None
@@ -381,6 +397,8 @@ class RequestUpdatePayload(BaseModel):
 
     jenis_tanah: Optional[int] = None
     luas_tanah: Optional[int] = None
+    kelas_bangunan_njop: Optional[int] = None
+    kelas_bumi_njop: Optional[int] = None
 
     file_ktp: Optional[str] = Field(default=None, max_length=255)
     file_sertifikat: Optional[str] = Field(default=None, max_length=255)
@@ -409,6 +427,8 @@ class StaffUpdatePayload(BaseModel):
     nip: Optional[str] = Field(default=None, max_length=50)
     tanggal_pelaksanaan: Optional[datetime] = None
     foto_objek_pajak: Optional[str] = Field(default=None, max_length=255)
+    kelas_bangunan_njop: Optional[int] = None
+    kelas_bumi_njop: Optional[int] = None
     status: Optional[str] = Field(default=None, max_length=50)
     keterangan: Optional[str] = Field(default=None, max_length=255)
 

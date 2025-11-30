@@ -27,6 +27,8 @@ from app.modules.spop.models import (
     RefStatusSubjek,
     RefPekerjaanSubjek,
     RefJenisTanah,
+    RefKelasBangunanNjop,
+    RefKelasBumiNjop,
     Spop,
     SpopRegistration,
 )
@@ -407,6 +409,42 @@ async def _build_status_maps(
     return result
 
 
+async def _build_njop_maps(
+    session: SessionDep,
+    regs: Iterable[SpopRegistration],
+) -> Dict[str, Dict[str, object]]:
+    def _as_int(value):
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    kelas_bangunan_ids = {_as_int(reg.kelas_bangunan_njop) for reg in regs if reg.kelas_bangunan_njop is not None}
+    kelas_bumi_ids = {_as_int(reg.kelas_bumi_njop) for reg in regs if reg.kelas_bumi_njop is not None}
+    kelas_bangunan_ids.discard(None)
+    kelas_bumi_ids.discard(None)
+
+    bangunan_map: Dict[int, RefKelasBangunanNjop] = {}
+    if kelas_bangunan_ids:
+        rows = await session.execute(select(RefKelasBangunanNjop).where(RefKelasBangunanNjop.id.in_(kelas_bangunan_ids)))
+        bangunan_map = {row.id: row for row in rows.scalars()}
+
+    bumi_map: Dict[int, RefKelasBumiNjop] = {}
+    if kelas_bumi_ids:
+        rows = await session.execute(select(RefKelasBumiNjop).where(RefKelasBumiNjop.id.in_(kelas_bumi_ids)))
+        bumi_map = {row.id: row for row in rows.scalars()}
+
+    result: Dict[str, Dict[str, object]] = {}
+    for reg in regs:
+        reg_kelas_bangunan = _as_int(reg.kelas_bangunan_njop)
+        reg_kelas_bumi = _as_int(reg.kelas_bumi_njop)
+        result[reg.id] = {
+            "kelas_bangunan": bangunan_map.get(reg_kelas_bangunan),
+            "kelas_bumi": bumi_map.get(reg_kelas_bumi),
+        }
+    return result
+
+
 def _keys_from_components(
     kd_propinsi: str,
     kd_dati2: str,
@@ -504,6 +542,7 @@ def _registration_to_record(
     codes: Dict[str, Dict[str, str]],
     subject_codes: Optional[Dict[str, Dict[str, str]]] = None,
     status_codes: Optional[Dict[str, Dict[str, str]]] = None,
+    njop_codes: Optional[Dict[str, Dict[str, Optional[object]]]] = None,
 ) -> schemas.RequestRecord:
     prov_info = schemas.RegionInfo(
         id=registration.provinsi_op,
@@ -546,6 +585,9 @@ def _registration_to_record(
         kode=(subject_codes or {}).get("kelurahan", {}).get("kode_pad", str(registration.kelurahan_subjek or "")),
         nama=(subject_codes or {}).get("kelurahan", {}).get("nama", ""),
     )
+
+    kelas_bangunan = _njop_class_to_schema((njop_codes or {}).get("kelas_bangunan"), registration.kelas_bangunan_njop)
+    kelas_bumi = _njop_class_to_schema((njop_codes or {}).get("kelas_bumi"), registration.kelas_bumi_njop)
 
     formatted_nop = _format_nop_fields(
         prov_info.kode or "",
@@ -598,6 +640,8 @@ def _registration_to_record(
             nama=(status_codes or {}).get("jenis_tanah", {}).get("nama", ""),
         ),
         luas_tanah=registration.luas_tanah,
+        kelas_bangunan_njop=kelas_bangunan,
+        kelas_bumi_njop=kelas_bumi,
         file_ktp=registration.file_ktp,
         file_sertifikat=registration.file_sertifikat,
         file_sppt_tetangga=registration.file_sppt_tetangga,
@@ -695,6 +739,10 @@ async def create_registration_request(
     if existing_nop.scalar_one_or_none() is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="NOP sudah terdaftar")
     form_number = datetime.now().strftime("%Y.%m.%d.%H.%M")
+    user_id = getattr(current_user, "id", None) or getattr(current_user, "sub", None)
+    if isinstance(user_id, str):
+        user_id = user_id.strip()
+    registration_user_id = user_id or payload.user_id
     registration = SpopRegistration(
         id=uuid4().hex,
         nop=nop_value,
@@ -735,6 +783,7 @@ async def create_registration_request(
         file_pendukung=payload.file_pendukung.strip() if payload.file_pendukung else None,
         status=payload.status.strip() if payload.status else None,
         keterangan=payload.keterangan.strip() if payload.keterangan else None,
+        user_id=registration_user_id,
         nama_petugas=None,
         nip=None,
         tanggal_pelaksanaan=None,
@@ -749,7 +798,8 @@ async def create_registration_request(
     resolved_codes = (await _build_code_maps(session, [registration])).get(registration.id, code_struct)
     resolved_subj = (await _build_subject_maps(session, [registration])).get(registration.id, {})
     resolved_status = (await _build_status_maps(session, [registration])).get(registration.id, {})
-    record = _registration_to_record(registration, resolved_codes, resolved_subj, resolved_status)
+    resolved_njop = (await _build_njop_maps(session, [registration])).get(registration.id, {})
+    record = _registration_to_record(registration, resolved_codes, resolved_subj, resolved_status, resolved_njop)
     record.nop = _format_nop_fields(
         resolved_codes.get("provinsi", {}).get("kode_pad", ""),
         resolved_codes.get("kabupaten", {}).get("kode_pad", ""),
@@ -782,12 +832,13 @@ async def list_registration_requests(
     code_map = await _build_code_maps(session, rows)
     subject_map = await _build_subject_maps(session, rows)
     status_map = await _build_status_maps(session, rows)
+    njop_map = await _build_njop_maps(session, rows)
     data: List[schemas.RequestRecord] = []
     for row in rows:
         codes = code_map.get(row.id, {})
         subj_codes = subject_map.get(row.id, {})
         status_codes = status_map.get(row.id, {})
-        rec = _registration_to_record(row, codes, subj_codes, status_codes)
+        rec = _registration_to_record(row, codes, subj_codes, status_codes, njop_map.get(row.id, {}))
         rec.nop = _format_nop_fields(
             codes.get("provinsi", {}).get("kode_pad", ""),
             codes.get("kabupaten", {}).get("kode_pad", ""),
@@ -823,7 +874,8 @@ async def get_registration_request(
     codes = (await _build_code_maps(session, [registration])).get(registration.id, {})
     subj_codes = (await _build_subject_maps(session, [registration])).get(registration.id, {})
     status_codes = (await _build_status_maps(session, [registration])).get(registration.id, {})
-    record = _registration_to_record(registration, codes, subj_codes, status_codes)
+    njop_codes = (await _build_njop_maps(session, [registration])).get(registration.id, {})
+    record = _registration_to_record(registration, codes, subj_codes, status_codes, njop_codes)
     record.nop = _format_nop_fields(
         codes.get("provinsi", {}).get("kode_pad", ""),
         codes.get("kabupaten", {}).get("kode_pad", ""),
@@ -867,7 +919,8 @@ async def update_registration_request(
     codes = (await _build_code_maps(session, [registration])).get(registration.id, {})
     subj_codes = (await _build_subject_maps(session, [registration])).get(registration.id, {})
     status_codes = (await _build_status_maps(session, [registration])).get(registration.id, {})
-    record = _registration_to_record(registration, codes, subj_codes, status_codes)
+    njop_codes = (await _build_njop_maps(session, [registration])).get(registration.id, {})
+    record = _registration_to_record(registration, codes, subj_codes, status_codes, njop_codes)
     record.nop = _format_nop_fields(
         codes.get("provinsi", {}).get("kode_pad", ""),
         codes.get("kabupaten", {}).get("kode_pad", ""),
@@ -896,6 +949,11 @@ async def update_registration_staff_fields(
     for key, value in updates.items():
         if isinstance(value, str):
             value = value.strip()
+        if key in ("kelas_bangunan_njop", "kelas_bumi_njop") and value is not None:
+            try:
+                value = int(value)
+            except (TypeError, ValueError):
+                value = None
         setattr(registration, key, value)
 
     await session.commit()
@@ -903,7 +961,8 @@ async def update_registration_staff_fields(
     codes = (await _build_code_maps(session, [registration])).get(registration.id, {})
     subj_codes = (await _build_subject_maps(session, [registration])).get(registration.id, {})
     status_codes = (await _build_status_maps(session, [registration])).get(registration.id, {})
-    record = _registration_to_record(registration, codes, subj_codes, status_codes)
+    njop_codes = (await _build_njop_maps(session, [registration])).get(registration.id, {})
+    record = _registration_to_record(registration, codes, subj_codes, status_codes, njop_codes)
     record.nop = _format_nop_fields(
         codes.get("provinsi", {}).get("kode_pad", ""),
         codes.get("kabupaten", {}).get("kode_pad", ""),
@@ -936,7 +995,18 @@ async def delete_registration_request(
 async def _fetch_spop_detail(
     session: SessionDep,
     keys: Dict[str, str],
-) -> Optional[Tuple[Spop, Optional[DatSubjekPajak], Optional[str], Optional[str], Optional[str], Optional[str]]]:
+) -> Optional[
+    Tuple[
+        Spop,
+        Optional[DatSubjekPajak],
+        Optional[str],
+        Optional[str],
+        Optional[str],
+        Optional[str],
+        Optional[RefKelasBangunanNjop],
+        Optional[RefKelasBumiNjop],
+    ]
+]:
     prop_alias = aliased(RefPropinsi)
     dati2_alias = aliased(RefDati2)
     kec_alias = aliased(RefKecamatan)
@@ -950,6 +1020,8 @@ async def _fetch_spop_detail(
             dati2_alias.nm_dati2,
             kec_alias.nm_kecamatan,
             kel_alias.nm_kelurahan,
+            RefKelasBangunanNjop,
+            RefKelasBumiNjop,
         )
         .outerjoin(DatSubjekPajak, _trim(DatSubjekPajak.subjek_pajak_id) == _trim(Spop.subjek_pajak_id))
         .outerjoin(prop_alias, prop_alias.kd_propinsi == func.substr(Spop.kd_propinsi, 1, 2))
@@ -977,6 +1049,8 @@ async def _fetch_spop_detail(
                 kel_alias.kd_kelurahan == func.substr(Spop.kd_kelurahan, 1, 3),
             ),
         )
+        .outerjoin(RefKelasBangunanNjop, RefKelasBangunanNjop.id == Spop.kelas_bangunan_njop)
+        .outerjoin(RefKelasBumiNjop, RefKelasBumiNjop.id == Spop.kelas_bumi_njop)
         .where(
             and_(
                 Spop.kd_propinsi == keys["kd_propinsi"],
@@ -1012,10 +1086,33 @@ def _subjek_to_schema(subjek: Optional[DatSubjekPajak]) -> Optional[schemas.Subj
     )
 
 
+def _njop_class_to_schema(ref, fallback_id: Optional[int] = None) -> Optional[schemas.NjopClass]:
+    if ref is None and fallback_id is None:
+        return None
+    if ref is None:
+        return schemas.NjopClass(id=fallback_id, kelas=None, njop=None)
+    kelas_val = None
+    if ref.kelas is not None:
+        try:
+            kelas_val = int(ref.kelas)
+        except (TypeError, ValueError):
+            kelas_val = None
+    return schemas.NjopClass(id=ref.id, kelas=kelas_val, njop=int(ref.njop) if ref.njop is not None else None)
+
+
 def _spop_to_detail(
-    spop_row: Tuple[Spop, Optional[DatSubjekPajak], Optional[str], Optional[str], Optional[str], Optional[str]],
+    spop_row: Tuple[
+        Spop,
+        Optional[DatSubjekPajak],
+        Optional[str],
+        Optional[str],
+        Optional[str],
+        Optional[str],
+        Optional[RefKelasBangunanNjop],
+        Optional[RefKelasBumiNjop],
+    ],
 ) -> schemas.SpopDetail:
-    spop, subjek, nm_propinsi, nm_dati2, nm_kecamatan, nm_kelurahan = spop_row
+    spop, subjek, nm_propinsi, nm_dati2, nm_kecamatan, nm_kelurahan, kelas_bangunan_ref, kelas_bumi_ref = spop_row
     keys = {
         key: _normalize_code(getattr(spop, key), length) or ""
         for key, length in NOP_SEGMENTS
@@ -1048,6 +1145,8 @@ def _spop_to_detail(
         kd_znt=spop.kd_znt,
         jns_bumi=spop.jns_bumi,
         nilai_sistem_bumi=int(spop.nilai_sistem_bumi),
+        kelas_bangunan_njop=_njop_class_to_schema(kelas_bangunan_ref, spop.kelas_bangunan_njop),
+        kelas_bumi_njop=_njop_class_to_schema(kelas_bumi_ref, spop.kelas_bumi_njop),
         tgl_pendataan_op=spop.tgl_pendataan_op,
         nm_pendataan_op=spop.nm_pendataan_op,
         nip_pendata=spop.nip_pendata,
@@ -1093,6 +1192,7 @@ async def list_spop(
     kd_kelurahan: Optional[str] = Query(None),
     kd_blok: Optional[str] = Query(None),
     kd_jns_op: Optional[str] = Query(None),
+    user_id: Optional[str] = Query(None),
     nm_wp: Optional[str] = Query(None),
     jalan_op: Optional[str] = Query(None),
     limit: int = Query(10, ge=1, le=200),
@@ -1136,6 +1236,8 @@ async def list_spop(
         filters.append(func.lower(_trim(DatSubjekPajak.nm_wp)).like(f"%{nm_wp.lower()}%"))
     if jalan_op:
         filters.append(func.lower(Spop.jalan_op).like(f"%{jalan_op.lower()}%"))
+    if user_id:
+        filters.append(func.trim(Spop.user_id) == user_id.strip())
 
     join_condition = _trim(DatSubjekPajak.subjek_pajak_id) == _trim(Spop.subjek_pajak_id)
 
@@ -1303,6 +1405,8 @@ async def create_spop(
         kd_znt=payload.kd_znt,
         jns_bumi=payload.jns_bumi,
         nilai_sistem_bumi=payload.nilai_sistem_bumi,
+        kelas_bangunan_njop=payload.kelas_bangunan_njop,
+        kelas_bumi_njop=payload.kelas_bumi_njop,
         tgl_pendataan_op=payload.tgl_pendataan_op,
         nm_pendataan_op=payload.nm_pendataan_op,
         nip_pendata=payload.nip_pendata,
@@ -1344,6 +1448,8 @@ async def _update_spop(session: SessionDep, keys: Dict[str, str], payload: schem
     spop.kd_znt = payload.kd_znt
     spop.jns_bumi = payload.jns_bumi
     spop.nilai_sistem_bumi = payload.nilai_sistem_bumi
+    spop.kelas_bangunan_njop = payload.kelas_bangunan_njop
+    spop.kelas_bumi_njop = payload.kelas_bumi_njop
     spop.tgl_pendataan_op = payload.tgl_pendataan_op
     spop.nm_pendataan_op = payload.nm_pendataan_op
     spop.nip_pendata = payload.nip_pendata
