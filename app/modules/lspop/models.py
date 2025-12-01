@@ -14,6 +14,7 @@ class LampiranSpop(Base):
     __tablename__ = "lampiran_spop"
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    spop_id: Mapped[Optional[str]] = mapped_column(String(32))
 
     # Bagian Atas
     nop: Mapped[Optional[str]] = mapped_column(String(50))

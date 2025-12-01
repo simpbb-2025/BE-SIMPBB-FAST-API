@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+from datetime import datetime
+from decimal import Decimal, ROUND_HALF_UP
 from typing import List, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
+from sqlalchemy.exc import MissingGreenlet, OperationalError
 
+from app.core.config import settings
 from app.core.deps import CurrentUserDep, SessionDep
 from app.modules.lspop import schemas
 from app.modules.lspop.models import (
@@ -27,7 +31,7 @@ from app.modules.lspop.models import (
     RefKelasBangunanSekolah,
     RefLetakTangkiMinyak,
 )
-from app.modules.spop.models import SpopRegistration
+from app.modules.spop.models import RefKelasBangunanNjop, RefKelasBumiNjop, SpopRegistration
 
 router = APIRouter(prefix="/lspop", tags=["lspop"])
 
@@ -41,6 +45,7 @@ def _to_record(row: LampiranSpop, lookups: Optional[dict] = None) -> schemas.Lam
 
     return schemas.LampiranRecord(
         id=row.id,
+        spop_id=row.spop_id,
         submitted_at=row.submitted_at,
         nop=row.nop,
         jumlah_bangunan=row.jumlah_bangunan,
@@ -140,12 +145,21 @@ async def _build_lookups(session: SessionDep, rows: List[LampiranSpop]) -> dict:
     return lookups
 
 
-async def _ensure_nop_exists(session: SessionDep, nop: str) -> None:
+async def _get_spop_by_nop(session: SessionDep, nop: str) -> SpopRegistration:
     if not nop:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="NOP wajib diisi")
-    exists = await session.execute(select(SpopRegistration.id).where(SpopRegistration.nop == nop).limit(1))
-    if exists.scalar_one_or_none() is None:
+    row = (
+        await session.execute(select(SpopRegistration).where(SpopRegistration.nop == nop).limit(1))
+    ).scalar_one_or_none()
+    if row is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="NOP tidak ditemukan di SPOP")
+    status_value = (row.status or "").strip().lower()
+    if status_value != "disetujui":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="NOP hanya bisa dipakai jika SPOP telah berstatus disetujui",
+        )
+    return row
 
 
 async def _load_payload(request: Request, model_cls):
@@ -159,6 +173,190 @@ async def _load_payload(request: Request, model_cls):
     return model_cls(**data)
 
 
+def _safe_int(value) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _normalize_nop_digits(raw_nop: Optional[str]) -> str:
+    digits = "".join(ch for ch in (raw_nop or "") if ch.isdigit())
+    if len(digits) != 18:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="NOP harus 18 digit")
+    return digits
+
+
+def _normalize_label(text: str) -> str:
+    # Buang digit dan whitespace, lowercase, untuk mencocokkan "1 Kabupaten Badung" == "Kabupaten Badung"
+    clean = "".join(ch for ch in (text or "") if not ch.isdigit())
+    return clean.strip().lower()
+
+
+async def _njop_value(session: SessionDep, model, class_id: Optional[int]) -> int:
+    if class_id is None:
+        return 0
+    row = await session.get(model, class_id)
+    if row is None:
+        return 0
+    return _safe_int(getattr(row, "njop", 0))
+
+
+async def _pick_pbb_tarif(session: SessionDep, spop_row: SpopRegistration) -> tuple[int, Decimal]:
+    """
+    Pilih tarif PBB dari tabel pbb_p2:
+    1) Jika PBB_TARIF_ID di env, wajib ada baris itu.
+    2) Jika tidak, pakai nama kabupaten (kabupaten_kota.nama_kabupaten) yang dicocokkan dengan pbb_p2.daerah (tanpa angka, case-insensitive).
+    Kolom yang dipakai: pbb_persen (angka desimal, misal 0.2).
+    """
+    # 1. Env override
+    if settings.pbb_tarif_id is not None:
+        result = await session.execute(
+            text("SELECT id, pbb_persen FROM pbb_p2 WHERE id = :id LIMIT 1"),
+            {"id": settings.pbb_tarif_id},
+        )
+        row = result.first()
+        if row is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Tarif PBB_TARIF_ID tidak ditemukan di pbb_p2",
+            )
+        return _safe_int(row[0]), Decimal(row[1] or 0)
+
+    # 2. Berdasarkan nama kabupaten
+    kab_id = _safe_int(spop_row.kabupaten_op)
+    if kab_id <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="kabupaten_op tidak valid untuk menentukan tarif PBB",
+        )
+
+    # Ambil nama kabupaten lalu cocokan dengan pbb_p2.daerah (normalisasi nama buang angka)
+    try:
+        kab_row = await session.execute(
+            text("SELECT nama_kabupaten FROM kabupaten_kota WHERE id_kabupaten = :id LIMIT 1"),
+            {"id": kab_id},
+        )
+        kab_name_row = kab_row.first()
+        kab_name = _normalize_label(kab_name_row[0]) if kab_name_row and kab_name_row[0] else ""
+    except OperationalError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Kolom/struktur kabupaten_kota tidak sesuai: {exc}",
+        ) from exc
+
+    if not kab_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nama kabupaten tidak ditemukan untuk menentukan tarif PBB",
+        )
+
+    try:
+        pbb_rows = await session.execute(text("SELECT id, daerah, pbb_persen FROM pbb_p2"))
+    except OperationalError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Kolom/struktur pbb_p2 tidak sesuai: {exc}",
+        ) from exc
+
+    match_id: Optional[int] = None
+    match_rate = Decimal(0)
+    for r in pbb_rows:
+        daerah_norm = _normalize_label(r.daerah)
+        if daerah_norm == kab_name:
+            match_id = _safe_int(r.id)
+            match_rate = Decimal(r.pbb_persen or 0)
+            break
+
+    if match_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tarif PBB untuk kabupaten_op tidak ditemukan di pbb_p2 (cocokkan nama daerah)",
+        )
+
+    return match_id, match_rate
+
+
+# Create SPPT automatically only when related SPOP is approved.
+async def _create_sppt_for_lspop(
+    session: SessionDep,
+    lspop: LampiranSpop,
+    spop_row: Optional[SpopRegistration] = None,
+) -> Optional[schemas.SpptAutoRecord]:
+    if spop_row is None:
+        spop_row = (
+            await session.execute(select(SpopRegistration).where(SpopRegistration.nop == lspop.nop).limit(1))
+        ).scalar_one_or_none()
+        if spop_row is None:
+            return None
+
+    status_value = (spop_row.status or "").strip().lower()
+    if status_value != "disetujui":
+        return None
+
+    nop_digits = _normalize_nop_digits(lspop.nop)
+    spop_nop_digits = _normalize_nop_digits(spop_row.nop)
+    if nop_digits != spop_nop_digits:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="NOP LSPOP tidak sama dengan SPOP")
+
+    bumi_rate = await _njop_value(session, RefKelasBumiNjop, spop_row.kelas_bumi_njop)
+    bangunan_rate = await _njop_value(session, RefKelasBangunanNjop, spop_row.kelas_bangunan_njop)
+
+    bumi_njop = _safe_int(spop_row.luas_tanah) * bumi_rate
+    bangunan_njop = _safe_int(lspop.luas_bangunan_m2) * bangunan_rate
+    total_njop = bumi_njop + bangunan_njop
+
+    njoptkp = _safe_int(settings.pbb_njoptkp)
+    tarif_id, tarif_decimal = await _pick_pbb_tarif(session, spop_row)
+
+    dasar_pengenaan = Decimal(total_njop) - Decimal(njoptkp)
+    if dasar_pengenaan < 0:
+        dasar_pengenaan = Decimal(0)
+    pbb_terhutang = int((dasar_pengenaan * tarif_decimal).quantize(Decimal("1."), rounding=ROUND_HALF_UP))
+
+    now = datetime.utcnow()
+
+    sppt_id = uuid4().hex
+    await session.execute(
+        text(
+            """
+            INSERT INTO sppt (
+                id, spop_id, lspop_id, nop, bumi_njop, bangunan_njop, njoptkp, pbb_persen, create_at
+            ) VALUES (
+                :id, :spop_id, :lspop_id, :nop, :bumi_njop, :bangunan_njop, :njoptkp, :pbb_persen, :create_at
+            )
+            """
+        ),
+        {
+            "id": sppt_id,
+            "spop_id": spop_row.id,
+            "lspop_id": lspop.id,
+            "nop": nop_digits,
+            "bumi_njop": bumi_njop,
+            "bangunan_njop": bangunan_njop,
+            "njoptkp": njoptkp,
+            "pbb_persen": tarif_id,
+            "create_at": now,
+        },
+    )
+    await session.commit()
+
+    return schemas.SpptAutoRecord(
+        id=sppt_id,
+        spop_id=spop_row.id,
+        lspop_id=lspop.id,
+        nop=nop_digits,
+        bumi_njop=bumi_njop,
+        bangunan_njop=bangunan_njop,
+        total_njop=total_njop,
+        njoptkp=njoptkp,
+        pbb_persen_id=tarif_id,
+        pbb_persen=float(tarif_decimal),
+        pbb_terhutang=pbb_terhutang,
+        create_at=now,
+    )
+
+
 @router.post("", response_model=schemas.LampiranResponse, status_code=status.HTTP_201_CREATED)
 async def create_lspop(
     request: Request,
@@ -166,20 +364,27 @@ async def create_lspop(
     current_user: CurrentUserDep,
 ) -> schemas.LampiranResponse:
     payload = await _load_payload(request, schemas.LampiranCreatePayload)
-    await _ensure_nop_exists(session, payload.nop)
+    spop_row = await _get_spop_by_nop(session, payload.nop)
     entity = LampiranSpop(id=uuid4().hex)
     data = payload.model_dump(exclude_unset=True)
     for key, value in data.items():
         if isinstance(value, str):
             value = value.strip()
         setattr(entity, key, value)
+    entity.spop_id = spop_row.id
 
     session.add(entity)
     await session.commit()
     await session.refresh(entity)
-    lookups = await _build_lookups(session, [entity])
+
+    sppt_record: Optional[schemas.SpptAutoRecord] = await _create_sppt_for_lspop(session, entity, spop_row)
+
+    try:
+        lookups = await _build_lookups(session, [entity])
+    except MissingGreenlet:
+        lookups = {}
     record = _to_record(entity, lookups)
-    return schemas.LampiranResponse(message="Lampiran SPOP berhasil dibuat", data=record)
+    return schemas.LampiranResponse(message="Lampiran SPOP berhasil dibuat", data=record, sppt=sppt_record)
 
 
 @router.get("", response_model=schemas.LampiranListResponse)

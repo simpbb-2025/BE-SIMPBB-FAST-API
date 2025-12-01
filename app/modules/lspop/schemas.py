@@ -97,6 +97,7 @@ class LampiranUpdatePayload(LampiranCreatePayload):
 class LampiranRecord(BaseModel):
     id: str
     submitted_at: datetime
+    spop_id: Optional[str] = None
 
     nop: Optional[str] = None
     jumlah_bangunan: Optional[int] = None
@@ -185,10 +186,26 @@ class Pagination(BaseModel):
     has_prev: bool
 
 
+class SpptAutoRecord(BaseModel):
+    id: str
+    spop_id: str
+    lspop_id: str
+    nop: str
+    bumi_njop: int
+    bangunan_njop: int
+    total_njop: int
+    njoptkp: int
+    pbb_persen_id: int
+    pbb_persen: float
+    pbb_terhutang: int
+    create_at: datetime
+
+
 class LampiranResponse(BaseModel):
     success: bool = True
     message: str
     data: LampiranRecord
+    sppt: Optional[SpptAutoRecord] = None
 
 
 class LampiranListResponse(BaseModel):

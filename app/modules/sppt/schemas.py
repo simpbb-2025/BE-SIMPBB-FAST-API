@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import List, Optional
 
 from pydantic import BaseModel, Field
@@ -91,6 +92,30 @@ class SpptDetailResponse(BaseResponse):
 
 class SpptBatchResponse(BaseResponse):
     data: List[SpptDetail]
+
+class SpptAutoItem(BaseModel):
+    id: str
+    spop_id: str
+    lspop_id: str
+    nop: str
+    bumi_njop: int
+    bangunan_njop: int
+    total_njop: int
+    njoptkp: int
+    pbb_persen_id: int
+    pbb_persen: float
+    pbb_terhutang: int
+    create_at: datetime
+
+
+class SpptAutoListResponse(BaseResponse):
+    data: List[SpptAutoItem]
+    total_bangunan: int
+    total_njop: int
+    pbb_persen_id: int
+    pbb_persen: float
+    pbb_terhutang: int
+    total_bangunan: int
 
 
 # E-SPPT public check

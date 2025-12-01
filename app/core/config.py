@@ -55,6 +55,10 @@ class Settings(BaseSettings):
     mail_ssl_tls: bool = Field(default=False, alias="MAIL_SSL_TLS")
     mail_use_credentials: bool = Field(default=True, alias="USE_CREDENTIALS")
 
+    # PBB configuration
+    pbb_njoptkp: int = Field(default=0, alias="PBB_NJOPTKP")
+    pbb_tarif_id: int | None = Field(default=None, alias="PBB_TARIF_ID")
+
     cors_origins: List[str] = Field(default_factory=lambda: ["*"], alias="CORS_ORIGINS")
     cors_allow_credentials: bool = Field(default=True, alias="CORS_ALLOW_CREDENTIALS")
     cors_allow_methods: List[str] = Field(default_factory=lambda: ["*"], alias="CORS_ALLOW_METHODS")

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from math import ceil
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlmodel import and_, or_, select
 
 from app.auth.service import get_current_user
@@ -79,6 +79,87 @@ async def _fetch_spop(
 
     result = await session.execute(stmt)
     return result.first()
+
+
+@router.get("", response_model=schemas.SpptAutoListResponse)
+async def list_sppt_by_nop(
+    session: SessionDep,
+    current_user: User = Depends(get_current_user),
+    nop: str = Query(..., min_length=5, max_length=32),
+) -> schemas.SpptAutoListResponse:
+    digits = "".join(ch for ch in (nop or "") if ch.isdigit())
+    if len(digits) != 18:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="NOP tidak valid")
+    nop_norm = digits
+
+    result = await session.execute(
+        text(
+            """
+            SELECT s.id, s.spop_id, s.lspop_id, s.nop, s.bumi_njop, s.bangunan_njop,
+                   COALESCE(s.bumi_njop,0) + COALESCE(s.bangunan_njop,0) AS total_njop,
+                   s.njoptkp,
+                   s.pbb_persen AS pbb_persen_id,
+                   COALESCE(t.pbb_persen, 0) AS pbb_persen_value,
+                   s.create_at
+            FROM sppt s
+            LEFT JOIN pbb_p2 t ON t.id = s.pbb_persen
+            WHERE s.nop = :nop
+            ORDER BY s.create_at DESC
+            """
+        ),
+        {"nop": nop_norm},
+    )
+    rows = result.mappings().all()
+    data: List[schemas.SpptAutoItem] = [_sppt_auto_row_to_schema(row) for row in rows]
+
+    total_bangunan = len(data)
+    if not data:
+        return schemas.SpptAutoListResponse(
+            message="Data SPPT",
+            data=[],
+            total_bangunan=0,
+            total_njop=0,
+            pbb_persen_id=0,
+            pbb_persen=0.0,
+            pbb_terhutang=0,
+        )
+
+    bumi_values = [item.bumi_njop for item in data]
+    bangunan_sum = sum(item.bangunan_njop for item in data)
+    bumi_njop = max(bumi_values) if bumi_values else 0
+    total_njop = bumi_njop + bangunan_sum
+    pbb_persen_id = data[0].pbb_persen_id
+    pbb_persen = data[0].pbb_persen
+    pbb_terhutang = max(total_njop - data[0].njoptkp, 0) * pbb_persen
+
+    return schemas.SpptAutoListResponse(
+        message="Data SPPT",
+        data=data,
+        total_bangunan=total_bangunan,
+        total_njop=total_njop,
+        pbb_persen_id=pbb_persen_id,
+        pbb_persen=pbb_persen,
+        pbb_terhutang=int(pbb_terhutang),
+    )
+
+def _sppt_auto_row_to_schema(row) -> schemas.SpptAutoItem:
+    total_njop = int(row["total_njop"] or (row["bumi_njop"] or 0) + (row["bangunan_njop"] or 0))
+    pbb_persen = float(row["pbb_persen_value"] or 0)
+    pbb_terhutang = max(total_njop - int(row["njoptkp"] or 0), 0) * pbb_persen
+    return schemas.SpptAutoItem(
+        id=str(row["id"]),
+        spop_id=str(row["spop_id"]),
+        lspop_id=str(row["lspop_id"]),
+        nop=str(row["nop"]),
+        bumi_njop=int(row["bumi_njop"] or 0),
+        bangunan_njop=int(row["bangunan_njop"] or 0),
+        total_njop=total_njop,
+        njoptkp=int(row["njoptkp"] or 0),
+        pbb_persen_id=int(row["pbb_persen_id"] or 0),
+        pbb_persen=pbb_persen,
+        pbb_terhutang=int(pbb_terhutang),
+        create_at=row["create_at"],
+    )
 
 
 def _spop_to_response(nop_fields: Dict[str, str], spop: Spop) -> schemas.SpopResponse:
