@@ -86,6 +86,12 @@ class SpptDetail(BaseModel):
     pbb_harus_bayar: float
 
 
+class NjopClass(BaseModel):
+    id: Optional[int] = None
+    kelas: Optional[str] = None
+    njop: Optional[int] = None
+
+
 class SpptDetailResponse(BaseResponse):
     data: SpptDetail
 
@@ -100,22 +106,22 @@ class SpptAutoItem(BaseModel):
     nop: str
     bumi_njop: int
     bangunan_njop: int
-    total_njop: int
-    njoptkp: int
-    pbb_persen_id: int
-    pbb_persen: float
-    pbb_terhutang: int
+    luas_bumi: int
+    luas_bangunan: int
+    kelas_bumi_njop: Optional[NjopClass] = None
+    kelas_bangunan_njop: Optional[NjopClass] = None
     create_at: datetime
 
 
 class SpptAutoListResponse(BaseResponse):
     data: List[SpptAutoItem]
     total_bangunan: int
+    total_luas_bumi: int
+    total_luas_bangunan: int
     total_njop: int
     pbb_persen_id: int
     pbb_persen: float
     pbb_terhutang: int
-    total_bangunan: int
 
 
 # E-SPPT public check

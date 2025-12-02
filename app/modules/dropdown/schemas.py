@@ -54,3 +54,16 @@ class LspopDropdownResponse(BaseModel):
     kelas_bangunan_apartemen: List[DropdownSimple]
     kelas_bangunan_sekolah: List[DropdownSimple]
     letak_tangki_minyak: List[DropdownSimple]
+
+
+class KelasNjopDropdownResponse(BaseModel):
+    success: bool = True
+    message: str
+    kelas_bumi_njop: List["DropdownKelasNjop"]
+    kelas_bangunan_njop: List["DropdownKelasNjop"]
+
+
+class DropdownKelasNjop(BaseModel):
+    id: int
+    kelas: str
+    njop: int

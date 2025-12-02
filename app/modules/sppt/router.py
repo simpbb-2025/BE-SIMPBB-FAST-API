@@ -100,9 +100,21 @@ async def list_sppt_by_nop(
                    s.njoptkp,
                    s.pbb_persen AS pbb_persen_id,
                    COALESCE(t.pbb_persen, 0) AS pbb_persen_value,
-                   s.create_at
+                   s.create_at,
+                   COALESCE(sr.luas_tanah, 0) AS luas_bumi,
+                   rb.id AS kelas_bumi_njop_id,
+                   rb.kelas AS kelas_bumi_njop_kelas,
+                   rb.njop AS kelas_bumi_njop_njop,
+                   sr.kelas_bangunan_njop AS kelas_bangunan_njop_id,
+                   rbn.kelas AS kelas_bangunan_njop_kelas,
+                   rbn.njop AS kelas_bangunan_njop_njop,
+                   COALESCE(ls.luas_bangunan_m2, 0) AS luas_bangunan
             FROM sppt s
             LEFT JOIN pbb_p2 t ON t.id = s.pbb_persen
+            LEFT JOIN spop_registration sr ON sr.id = s.spop_id
+            LEFT JOIN kelas_bumi_njop rb ON rb.id = sr.kelas_bumi_njop
+            LEFT JOIN lampiran_spop ls ON ls.id = s.lspop_id
+            LEFT JOIN kelas_bangunan_njop rbn ON rbn.id = sr.kelas_bangunan_njop
             WHERE s.nop = :nop
             ORDER BY s.create_at DESC
             """
@@ -110,42 +122,46 @@ async def list_sppt_by_nop(
         {"nop": nop_norm},
     )
     rows = result.mappings().all()
-    data: List[schemas.SpptAutoItem] = [_sppt_auto_row_to_schema(row) for row in rows]
+    items: List[schemas.SpptAutoItem] = [_sppt_auto_row_to_schema(row) for row in rows]
 
-    total_bangunan = len(data)
-    if not data:
+    total_bangunan = len(items)
+    if not items:
         return schemas.SpptAutoListResponse(
             message="Data SPPT",
             data=[],
             total_bangunan=0,
+            total_luas_bumi=0,
+            total_luas_bangunan=0,
             total_njop=0,
             pbb_persen_id=0,
             pbb_persen=0.0,
             pbb_terhutang=0,
         )
 
-    bumi_values = [item.bumi_njop for item in data]
-    bangunan_sum = sum(item.bangunan_njop for item in data)
-    bumi_njop = max(bumi_values) if bumi_values else 0
-    total_njop = bumi_njop + bangunan_sum
-    pbb_persen_id = data[0].pbb_persen_id
-    pbb_persen = data[0].pbb_persen
-    pbb_terhutang = max(total_njop - data[0].njoptkp, 0) * pbb_persen
+    # Hitung summary: 1x bumi_njop + seluruh bangunan_njop
+    bumi_njop = max((int(row["bumi_njop"] or 0) for row in rows), default=0)
+    bangunan_sum = sum(int(row["bangunan_njop"] or 0) for row in rows)
+    summary_total_njop = bumi_njop + bangunan_sum
+    pbb_persen_id = int(rows[0]["pbb_persen_id"] or 0)
+    pbb_persen = float(rows[0]["pbb_persen_value"] or 0)
+    njoptkp = int(rows[0]["njoptkp"] or 0)
+    summary_pbb_terhutang = int(max(summary_total_njop - njoptkp, 0) * pbb_persen)
+    total_luas_bumi = max((int(row["luas_bumi"] or 0) for row in rows), default=0)
+    total_luas_bangunan = sum(int(row["luas_bangunan"] or 0) for row in rows)
 
     return schemas.SpptAutoListResponse(
         message="Data SPPT",
-        data=data,
+        data=items,
         total_bangunan=total_bangunan,
-        total_njop=total_njop,
+        total_luas_bumi=total_luas_bumi,
+        total_luas_bangunan=total_luas_bangunan,
+        total_njop=summary_total_njop,
         pbb_persen_id=pbb_persen_id,
         pbb_persen=pbb_persen,
-        pbb_terhutang=int(pbb_terhutang),
+        pbb_terhutang=summary_pbb_terhutang,
     )
 
 def _sppt_auto_row_to_schema(row) -> schemas.SpptAutoItem:
-    total_njop = int(row["total_njop"] or (row["bumi_njop"] or 0) + (row["bangunan_njop"] or 0))
-    pbb_persen = float(row["pbb_persen_value"] or 0)
-    pbb_terhutang = max(total_njop - int(row["njoptkp"] or 0), 0) * pbb_persen
     return schemas.SpptAutoItem(
         id=str(row["id"]),
         spop_id=str(row["spop_id"]),
@@ -153,11 +169,22 @@ def _sppt_auto_row_to_schema(row) -> schemas.SpptAutoItem:
         nop=str(row["nop"]),
         bumi_njop=int(row["bumi_njop"] or 0),
         bangunan_njop=int(row["bangunan_njop"] or 0),
-        total_njop=total_njop,
-        njoptkp=int(row["njoptkp"] or 0),
-        pbb_persen_id=int(row["pbb_persen_id"] or 0),
-        pbb_persen=pbb_persen,
-        pbb_terhutang=int(pbb_terhutang),
+        luas_bumi=int(row["luas_bumi"] or 0),
+        luas_bangunan=int(row["luas_bangunan"] or 0),
+        kelas_bumi_njop=schemas.NjopClass(
+            id=int(row["kelas_bumi_njop_id"]),
+            kelas=str(row["kelas_bumi_njop_kelas"]),
+            njop=int(row["kelas_bumi_njop_njop"]),
+        )
+        if row["kelas_bumi_njop_id"] is not None
+        else None,
+        kelas_bangunan_njop=schemas.NjopClass(
+            id=int(row["kelas_bangunan_njop_id"]),
+            kelas=str(row["kelas_bangunan_njop_kelas"]),
+            njop=int(row["kelas_bangunan_njop_njop"]),
+        )
+        if row["kelas_bangunan_njop_id"] is not None
+        else None,
         create_at=row["create_at"],
     )
 

@@ -30,6 +30,7 @@ from app.modules.lspop.models import (
     RefKelasBangunanSekolah,
     RefLetakTangkiMinyak,
 )
+from app.modules.spop.models import RefKelasBumiNjop, RefKelasBangunanNjop
 
 
 router = APIRouter(prefix="/dropdown", tags=["dropdown"])
@@ -132,4 +133,26 @@ async def dropdown_lspop(session: SessionDep) -> schemas.LspopDropdownResponse:
         kelas_bangunan_apartemen=to_simple(kelas_apart),
         kelas_bangunan_sekolah=to_simple(kelas_sekolah),
         letak_tangki_minyak=to_simple(letak_tangki),
+    )
+
+
+@router.get("/kelas-njop", response_model=schemas.KelasNjopDropdownResponse)
+async def dropdown_kelas_njop(session: SessionDep) -> schemas.KelasNjopDropdownResponse:
+    bumi_rows = await session.execute(
+        select(RefKelasBumiNjop.id, RefKelasBumiNjop.kelas, RefKelasBumiNjop.njop)
+    )
+    bangunan_rows = await session.execute(
+        select(RefKelasBangunanNjop.id, RefKelasBangunanNjop.kelas, RefKelasBangunanNjop.njop)
+    )
+
+    def to_kelas(rows):
+        return [
+            schemas.DropdownKelasNjop(id=row.id, kelas=str(row.kelas), njop=int(row.njop))
+            for row in rows
+        ]
+
+    return schemas.KelasNjopDropdownResponse(
+        message="Data dropdown kelas NJOP berhasil diambil",
+        kelas_bumi_njop=to_kelas(bumi_rows),
+        kelas_bangunan_njop=to_kelas(bangunan_rows),
     )

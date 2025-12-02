@@ -193,11 +193,6 @@ class SpptAutoRecord(BaseModel):
     nop: str
     bumi_njop: int
     bangunan_njop: int
-    total_njop: int
-    njoptkp: int
-    pbb_persen_id: int
-    pbb_persen: float
-    pbb_terhutang: int
     create_at: datetime
 
 

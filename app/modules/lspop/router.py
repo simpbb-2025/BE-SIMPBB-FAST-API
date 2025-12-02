@@ -348,11 +348,6 @@ async def _create_sppt_for_lspop(
         nop=nop_digits,
         bumi_njop=bumi_njop,
         bangunan_njop=bangunan_njop,
-        total_njop=total_njop,
-        njoptkp=njoptkp,
-        pbb_persen_id=tarif_id,
-        pbb_persen=float(tarif_decimal),
-        pbb_terhutang=pbb_terhutang,
         create_at=now,
     )
 
