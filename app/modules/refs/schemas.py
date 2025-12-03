@@ -5,6 +5,22 @@ from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
+class Pagination(BaseModel):
+    total: int
+    page: int
+    limit: int
+    pages: int
+    has_next: bool
+    has_prev: bool
+
+    @classmethod
+    def create(cls, *, total: int, page: int, limit: int) -> "Pagination":
+        pages = (total + limit - 1) // limit if total else 0
+        has_next = page < pages if pages else False
+        has_prev = page > 1
+        return cls(total=total, page=page, limit=limit, pages=pages, has_next=has_next, has_prev=has_prev)
+
+
 class BaseResponse(BaseModel):
     success: bool = True
     message: str
@@ -36,6 +52,7 @@ class ProvinsiUpdate(BaseModel):
 
 class ProvinsiListResponse(BaseResponse):
     items: List[ProvinsiOut]
+    meta: Pagination
 
 
 class ProvinsiDetailResponse(BaseResponse):
@@ -71,6 +88,7 @@ class KabupatenUpdate(BaseModel):
 
 class KabupatenListResponse(BaseResponse):
     items: List[KabupatenOut]
+    meta: Pagination
 
 
 class KabupatenDetailResponse(BaseResponse):
@@ -109,6 +127,7 @@ class KecamatanUpdate(BaseModel):
 
 class KecamatanListResponse(BaseResponse):
     items: List[KecamatanOut]
+    meta: Pagination
 
 
 class KecamatanDetailResponse(BaseResponse):
@@ -150,6 +169,7 @@ class KelurahanUpdate(BaseModel):
 
 class KelurahanListResponse(BaseResponse):
     items: List[KelurahanOut]
+    meta: Pagination
 
 
 class KelurahanDetailResponse(BaseResponse):
@@ -200,6 +220,7 @@ class KelasBumiUpdate(BaseModel):
 
 class KelasBumiListResponse(BaseResponse):
     items: List[KelasBumiOut]
+    meta: Pagination
 
 
 class KelasBumiDetailResponse(BaseResponse):
@@ -250,6 +271,7 @@ class KelasBangunanUpdate(BaseModel):
 
 class KelasBangunanListResponse(BaseResponse):
     items: List[KelasBangunanOut]
+    meta: Pagination
 
 
 class KelasBangunanDetailResponse(BaseResponse):

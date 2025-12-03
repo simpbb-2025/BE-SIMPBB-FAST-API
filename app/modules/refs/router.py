@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import select
+from fastapi import APIRouter, HTTPException, Query, status
+from sqlalchemy import select, func
 
 from app.core.deps import SessionDep, CurrentUserDep
 from app.modules.refs import schemas
@@ -25,10 +25,18 @@ async def _get_or_404(session: SessionDep, model, item_id: int, message: str):
 
 
 @router.get("/provinsi", response_model=schemas.ProvinsiListResponse)
-async def list_provinsi(session: SessionDep, current_user: CurrentUserDep) -> schemas.ProvinsiListResponse:
-    rows = await session.execute(select(RefProvinsi))
+async def list_provinsi(
+    session: SessionDep,
+    current_user: CurrentUserDep,
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+) -> schemas.ProvinsiListResponse:
+    offset = (page - 1) * limit
+    total = (await session.execute(select(func.count()).select_from(RefProvinsi))).scalar_one()
+    rows = await session.execute(select(RefProvinsi).order_by(RefProvinsi.id_provinsi).offset(offset).limit(limit))
     items = [schemas.ProvinsiOut.model_validate(row) for row in rows.scalars().all()]
-    return schemas.ProvinsiListResponse(message="Daftar provinsi berhasil diambil", items=items)
+    meta = schemas.Pagination.create(total=total, page=page, limit=limit)
+    return schemas.ProvinsiListResponse(message="Daftar provinsi berhasil diambil", items=items, meta=meta)
 
 
 @router.post("/provinsi", response_model=schemas.ProvinsiDetailResponse, status_code=status.HTTP_201_CREATED)
@@ -73,10 +81,20 @@ async def delete_provinsi(prov_id: int, session: SessionDep, current_user: Curre
 
 
 @router.get("/kabupaten", response_model=schemas.KabupatenListResponse)
-async def list_kabupaten(session: SessionDep, current_user: CurrentUserDep) -> schemas.KabupatenListResponse:
-    rows = await session.execute(select(RefKabupaten))
+async def list_kabupaten(
+    session: SessionDep,
+    current_user: CurrentUserDep,
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+) -> schemas.KabupatenListResponse:
+    offset = (page - 1) * limit
+    total = (await session.execute(select(func.count()).select_from(RefKabupaten))).scalar_one()
+    rows = await session.execute(
+        select(RefKabupaten).order_by(RefKabupaten.id_kabupaten).offset(offset).limit(limit)
+    )
     items = [schemas.KabupatenOut.model_validate(row) for row in rows.scalars().all()]
-    return schemas.KabupatenListResponse(message="Daftar kabupaten/kota berhasil diambil", items=items)
+    meta = schemas.Pagination.create(total=total, page=page, limit=limit)
+    return schemas.KabupatenListResponse(message="Daftar kabupaten/kota berhasil diambil", items=items, meta=meta)
 
 
 @router.post("/kabupaten", response_model=schemas.KabupatenDetailResponse, status_code=status.HTTP_201_CREATED)
@@ -129,10 +147,20 @@ async def delete_kabupaten(
 
 
 @router.get("/kecamatan", response_model=schemas.KecamatanListResponse)
-async def list_kecamatan(session: SessionDep, current_user: CurrentUserDep) -> schemas.KecamatanListResponse:
-    rows = await session.execute(select(RefKecamatanBaru))
+async def list_kecamatan(
+    session: SessionDep,
+    current_user: CurrentUserDep,
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+) -> schemas.KecamatanListResponse:
+    offset = (page - 1) * limit
+    total = (await session.execute(select(func.count()).select_from(RefKecamatanBaru))).scalar_one()
+    rows = await session.execute(
+        select(RefKecamatanBaru).order_by(RefKecamatanBaru.id_kecamatan).offset(offset).limit(limit)
+    )
     items = [schemas.KecamatanOut.model_validate(row) for row in rows.scalars().all()]
-    return schemas.KecamatanListResponse(message="Daftar kecamatan berhasil diambil", items=items)
+    meta = schemas.Pagination.create(total=total, page=page, limit=limit)
+    return schemas.KecamatanListResponse(message="Daftar kecamatan berhasil diambil", items=items, meta=meta)
 
 
 @router.post("/kecamatan", response_model=schemas.KecamatanDetailResponse, status_code=status.HTTP_201_CREATED)
@@ -186,10 +214,20 @@ async def delete_kecamatan(
 
 
 @router.get("/kelurahan", response_model=schemas.KelurahanListResponse)
-async def list_kelurahan(session: SessionDep, current_user: CurrentUserDep) -> schemas.KelurahanListResponse:
-    rows = await session.execute(select(RefKelurahanBaru))
+async def list_kelurahan(
+    session: SessionDep,
+    current_user: CurrentUserDep,
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+) -> schemas.KelurahanListResponse:
+    offset = (page - 1) * limit
+    total = (await session.execute(select(func.count()).select_from(RefKelurahanBaru))).scalar_one()
+    rows = await session.execute(
+        select(RefKelurahanBaru).order_by(RefKelurahanBaru.id_kelurahan).offset(offset).limit(limit)
+    )
     items = [schemas.KelurahanOut.model_validate(row) for row in rows.scalars().all()]
-    return schemas.KelurahanListResponse(message="Daftar kelurahan/desa berhasil diambil", items=items)
+    meta = schemas.Pagination.create(total=total, page=page, limit=limit)
+    return schemas.KelurahanListResponse(message="Daftar kelurahan/desa berhasil diambil", items=items, meta=meta)
 
 
 @router.post("/kelurahan", response_model=schemas.KelurahanDetailResponse, status_code=status.HTTP_201_CREATED)
@@ -245,10 +283,20 @@ async def delete_kelurahan(
 
 @router.get("/kelas-bumi-njop", response_model=schemas.KelasBumiListResponse)
 @router.get("/kelas-bumi-njop/", response_model=schemas.KelasBumiListResponse, include_in_schema=False)
-async def list_kelas_bumi(session: SessionDep, current_user: CurrentUserDep) -> schemas.KelasBumiListResponse:
-    rows = await session.execute(select(RefKelasBumiNjop))
+async def list_kelas_bumi(
+    session: SessionDep,
+    current_user: CurrentUserDep,
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+) -> schemas.KelasBumiListResponse:
+    offset = (page - 1) * limit
+    total = (await session.execute(select(func.count()).select_from(RefKelasBumiNjop))).scalar_one()
+    rows = await session.execute(
+        select(RefKelasBumiNjop).order_by(RefKelasBumiNjop.id).offset(offset).limit(limit)
+    )
     items = [schemas.KelasBumiOut.model_validate(row) for row in rows.scalars().all()]
-    return schemas.KelasBumiListResponse(message="Daftar kelas bumi NJOP berhasil diambil", items=items)
+    meta = schemas.Pagination.create(total=total, page=page, limit=limit)
+    return schemas.KelasBumiListResponse(message="Daftar kelas bumi NJOP berhasil diambil", items=items, meta=meta)
 
 
 @router.post("/kelas-bumi-njop", response_model=schemas.KelasBumiDetailResponse, status_code=status.HTTP_201_CREATED)
@@ -326,11 +374,19 @@ async def delete_kelas_bumi(
     include_in_schema=False,
 )
 async def list_kelas_bangunan(
-    session: SessionDep, current_user: CurrentUserDep
+    session: SessionDep,
+    current_user: CurrentUserDep,
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
 ) -> schemas.KelasBangunanListResponse:
-    rows = await session.execute(select(RefKelasBangunanNjop))
+    offset = (page - 1) * limit
+    total = (await session.execute(select(func.count()).select_from(RefKelasBangunanNjop))).scalar_one()
+    rows = await session.execute(
+        select(RefKelasBangunanNjop).order_by(RefKelasBangunanNjop.id).offset(offset).limit(limit)
+    )
     items = [schemas.KelasBangunanOut.model_validate(row) for row in rows.scalars().all()]
-    return schemas.KelasBangunanListResponse(message="Daftar kelas bangunan NJOP berhasil diambil", items=items)
+    meta = schemas.Pagination.create(total=total, page=page, limit=limit)
+    return schemas.KelasBangunanListResponse(message="Daftar kelas bangunan NJOP berhasil diambil", items=items, meta=meta)
 
 
 @router.post(
