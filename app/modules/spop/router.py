@@ -820,9 +820,14 @@ async def list_registration_requests(
     current_user: CurrentUserDep,
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
+    user_id: Optional[str] = Query(None),
 ) -> schemas.RequestListResponse:
     stmt = select(SpopRegistration).order_by(SpopRegistration.submitted_at.desc())
     count_stmt = select(func.count()).select_from(SpopRegistration)
+    if user_id:
+        trimmed = user_id.strip()
+        stmt = stmt.where(func.trim(SpopRegistration.user_id) == trimmed)
+        count_stmt = count_stmt.where(func.trim(SpopRegistration.user_id) == trimmed)
 
     total = (await session.execute(count_stmt)).scalar_one()
     offset = (page - 1) * limit
@@ -933,6 +938,7 @@ async def update_registration_request(
     return schemas.RequestResponse(message="Permohonan berhasil diperbarui", data=record)
 
 
+@router.put("/staff/{request_id}", response_model=schemas.RequestResponse, include_in_schema=False)
 @router.post("/staff/{request_id}", response_model=schemas.RequestResponse, include_in_schema=False)
 async def update_registration_staff_fields(
     request_id: str,
@@ -1427,51 +1433,83 @@ async def create_spop(
     return schemas.SpopMutationResponse(message="SPOP berhasil ditambahkan", data=detail)
 
 
+SPOP_MUTABLE_FIELDS = [
+    "jns_transaksi_op",
+    "jalan_op",
+    "blok_kav_no_op",
+    "kelurahan_op",
+    "rw_op",
+    "rt_op",
+    "kd_status_wp",
+    "luas_bumi",
+    "kd_znt",
+    "jns_bumi",
+    "nilai_sistem_bumi",
+    "kelas_bangunan_njop",
+    "kelas_bumi_njop",
+    "tgl_pendataan_op",
+    "nm_pendataan_op",
+    "nip_pendata",
+    "tgl_pemeriksaan_op",
+    "nm_pemeriksaan_op",
+    "nip_pemeriksa_op",
+    "no_persil",
+    "kd_propinsi_bersama",
+    "kd_dati2_bersama",
+    "kd_kecamatan_bersama",
+    "kd_kelurahan_bersama",
+    "kd_blok_bersama",
+    "no_urut_bersama",
+    "kd_jns_op_bersama",
+    "kd_propinsi_asal",
+    "kd_dati2_asal",
+    "kd_kecamatan_asal",
+    "kd_kelurahan_asal",
+    "kd_blok_asal",
+    "no_urut_asal",
+    "kd_jns_op_asal",
+    "no_sppt_lama",
+]
+
+
+async def _apply_spop_updates(session: SessionDep, spop: Spop, updates: Dict[str, object]) -> None:
+    subjek_id = updates.pop("subjek_pajak_id", None)
+    if subjek_id is not None:
+        stripped = subjek_id.strip()
+        if stripped and stripped != spop.subjek_pajak_id.strip():
+            await _ensure_subjek_exists(session, stripped)
+            spop.subjek_pajak_id = stripped
+
+    for field in SPOP_MUTABLE_FIELDS:
+        if field in updates:
+            setattr(spop, field, updates[field])
+
+
 async def _update_spop(session: SessionDep, keys: Dict[str, str], payload: schemas.SpopUpdatePayload) -> schemas.SpopDetail:
     detail_row = await _fetch_spop_detail(session, keys)
     if detail_row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="SPOP tidak ditemukan")
 
     spop: Spop = detail_row[0]
-    if payload.subjek_pajak_id.strip() != spop.subjek_pajak_id.strip():
-        await _ensure_subjek_exists(session, payload.subjek_pajak_id)
-        spop.subjek_pajak_id = payload.subjek_pajak_id.strip()
+    updates = payload.model_dump(exclude_unset=True)
+    await _apply_spop_updates(session, spop, updates)
 
-    spop.jns_transaksi_op = payload.jns_transaksi_op
-    spop.jalan_op = payload.jalan_op
-    spop.blok_kav_no_op = payload.blok_kav_no_op
-    spop.kelurahan_op = payload.kelurahan_op
-    spop.rw_op = payload.rw_op
-    spop.rt_op = payload.rt_op
-    spop.kd_status_wp = payload.kd_status_wp
-    spop.luas_bumi = payload.luas_bumi
-    spop.kd_znt = payload.kd_znt
-    spop.jns_bumi = payload.jns_bumi
-    spop.nilai_sistem_bumi = payload.nilai_sistem_bumi
-    spop.kelas_bangunan_njop = payload.kelas_bangunan_njop
-    spop.kelas_bumi_njop = payload.kelas_bumi_njop
-    spop.tgl_pendataan_op = payload.tgl_pendataan_op
-    spop.nm_pendataan_op = payload.nm_pendataan_op
-    spop.nip_pendata = payload.nip_pendata
-    spop.tgl_pemeriksaan_op = payload.tgl_pemeriksaan_op
-    spop.nm_pemeriksaan_op = payload.nm_pemeriksaan_op
-    spop.nip_pemeriksa_op = payload.nip_pemeriksa_op
-    spop.no_persil = payload.no_persil
-    spop.kd_propinsi_bersama = payload.kd_propinsi_bersama
-    spop.kd_dati2_bersama = payload.kd_dati2_bersama
-    spop.kd_kecamatan_bersama = payload.kd_kecamatan_bersama
-    spop.kd_kelurahan_bersama = payload.kd_kelurahan_bersama
-    spop.kd_blok_bersama = payload.kd_blok_bersama
-    spop.no_urut_bersama = payload.no_urut_bersama
-    spop.kd_jns_op_bersama = payload.kd_jns_op_bersama
-    spop.kd_propinsi_asal = payload.kd_propinsi_asal
-    spop.kd_dati2_asal = payload.kd_dati2_asal
-    spop.kd_kecamatan_asal = payload.kd_kecamatan_asal
-    spop.kd_kelurahan_asal = payload.kd_kelurahan_asal
-    spop.kd_blok_asal = payload.kd_blok_asal
-    spop.no_urut_asal = payload.no_urut_asal
-    spop.kd_jns_op_asal = payload.kd_jns_op_asal
-    spop.no_sppt_lama = payload.no_sppt_lama
+    await session.commit()
+
+    refreshed = await _fetch_spop_detail(session, keys)
+    return _spop_to_detail(refreshed)
+
+
+async def _partial_update_spop(
+    session: SessionDep, keys: Dict[str, str], payload: schemas.SpopPartialUpdatePayload
+) -> schemas.SpopDetail:
+    detail_row = await _fetch_spop_detail(session, keys)
+    if detail_row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="SPOP tidak ditemukan")
+
+    spop: Spop = detail_row[0]
+    updates = payload.model_dump(exclude_unset=True)
+    await _apply_spop_updates(session, spop, updates)
 
     await session.commit()
 
@@ -1508,6 +1546,35 @@ async def update_spop_by_components(
     return schemas.SpopMutationResponse(message="SPOP berhasil diperbarui", data=detail)
 
 
+@router.patch(
+    "/{kd_propinsi}/{kd_dati2}/{kd_kecamatan}/{kd_kelurahan}/{kd_blok}/{no_urut}/{kd_jns_op}",
+    response_model=schemas.SpopMutationResponse,
+)
+async def partial_update_spop_by_components(
+    kd_propinsi: str,
+    kd_dati2: str,
+    kd_kecamatan: str,
+    kd_kelurahan: str,
+    kd_blok: str,
+    no_urut: str,
+    kd_jns_op: str,
+    payload: schemas.SpopPartialUpdatePayload,
+    session: SessionDep,
+    current_user: CurrentUserDep,
+) -> schemas.SpopMutationResponse:
+    keys = _keys_from_components(
+        kd_propinsi,
+        kd_dati2,
+        kd_kecamatan,
+        kd_kelurahan,
+        kd_blok,
+        no_urut,
+        kd_jns_op,
+    )
+    detail = await _partial_update_spop(session, keys, payload)
+    return schemas.SpopMutationResponse(message="SPOP berhasil diperbarui", data=detail)
+
+
 @router.put("/nop/{nop}", response_model=schemas.SpopMutationResponse)
 async def update_spop_by_nop(
     nop: str,
@@ -1517,6 +1584,18 @@ async def update_spop_by_nop(
 ) -> schemas.SpopMutationResponse:
     keys = _parse_nop(nop)
     detail = await _update_spop(session, keys, payload)
+    return schemas.SpopMutationResponse(message="SPOP berhasil diperbarui", data=detail)
+
+
+@router.patch("/nop/{nop}", response_model=schemas.SpopMutationResponse)
+async def partial_update_spop_by_nop(
+    nop: str,
+    payload: schemas.SpopPartialUpdatePayload,
+    session: SessionDep,
+    current_user: CurrentUserDep,
+) -> schemas.SpopMutationResponse:
+    keys = _parse_nop(nop)
+    detail = await _partial_update_spop(session, keys, payload)
     return schemas.SpopMutationResponse(message="SPOP berhasil diperbarui", data=detail)
 
 

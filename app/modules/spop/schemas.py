@@ -123,6 +123,52 @@ class SpopUpdatePayload(SpopBasePayload):
         return self
 
 
+class SpopPartialUpdatePayload(BaseModel):
+    subjek_pajak_id: Optional[str] = None
+    jns_transaksi_op: Optional[str] = Field(default=None, min_length=1, max_length=1)
+    jalan_op: Optional[str] = None
+    blok_kav_no_op: Optional[str] = None
+    kelurahan_op: Optional[str] = None
+    rw_op: Optional[str] = None
+    rt_op: Optional[str] = None
+    kd_status_wp: Optional[str] = Field(default=None, min_length=1, max_length=1)
+    luas_bumi: Optional[int] = None
+    kd_znt: Optional[str] = None
+    jns_bumi: Optional[str] = Field(default=None, min_length=1, max_length=1)
+    nilai_sistem_bumi: Optional[int] = None
+    kelas_bangunan_njop: Optional[int] = None
+    kelas_bumi_njop: Optional[int] = None
+    tgl_pendataan_op: Optional[date] = None
+    nm_pendataan_op: Optional[str] = None
+    nip_pendata: Optional[str] = None
+    tgl_pemeriksaan_op: Optional[date] = None
+    nm_pemeriksaan_op: Optional[str] = None
+    nip_pemeriksa_op: Optional[str] = None
+    no_persil: Optional[str] = None
+    kd_propinsi_bersama: Optional[str] = None
+    kd_dati2_bersama: Optional[str] = None
+    kd_kecamatan_bersama: Optional[str] = None
+    kd_kelurahan_bersama: Optional[str] = None
+    kd_blok_bersama: Optional[str] = None
+    no_urut_bersama: Optional[str] = None
+    kd_jns_op_bersama: Optional[str] = None
+    kd_propinsi_asal: Optional[str] = None
+    kd_dati2_asal: Optional[str] = None
+    kd_kecamatan_asal: Optional[str] = None
+    kd_kelurahan_asal: Optional[str] = None
+    kd_blok_asal: Optional[str] = None
+    no_urut_asal: Optional[str] = None
+    kd_jns_op_asal: Optional[str] = None
+    no_sppt_lama: Optional[str] = None
+
+    @model_validator(mode="after")
+    def ensure_changes(self) -> "SpopPartialUpdatePayload":
+        data = self.model_dump(exclude_unset=True, exclude_none=True)
+        if not data:
+            raise ValueError("Tidak ada data yang diperbarui")
+        return self
+
+
 class SpopDeleteResponse(BaseModel):
     success: bool = True
     message: str

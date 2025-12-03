@@ -56,7 +56,7 @@ class UserUpdate(BaseModel):
 class UserRead(BaseModel):
     id: str
     username: str
-    email: EmailStr
+    email: str
     nama: Optional[str]
     telepon: str
     alamat: str
