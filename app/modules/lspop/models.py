@@ -15,6 +15,7 @@ class LampiranSpop(Base):
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
     spop_id: Mapped[Optional[str]] = mapped_column(String(32))
+    no_formulir: Mapped[Optional[str]] = mapped_column(String(20))
 
     # Bagian Atas
     nop: Mapped[Optional[str]] = mapped_column(String(50))
@@ -115,6 +116,13 @@ class LampiranSpop(Base):
 
     # Berkas
     foto_objek_pajak: Mapped[Optional[str]] = mapped_column(String(255))
+
+    # Petugas
+    nama_petugas: Mapped[Optional[str]] = mapped_column(String(255))
+    nip: Mapped[Optional[str]] = mapped_column(String(50))
+    kelas_bangunan_njop: Mapped[Optional[int]] = mapped_column(Integer)
+    tanggal_pelaksanaan: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    status: Mapped[Optional[str]] = mapped_column(String(50))
 
     submitted_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
 

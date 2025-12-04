@@ -3,7 +3,12 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+
+class SpopInfo(BaseModel):
+    nama: Optional[str] = None
+    status_akhir: Optional[str] = None
 
 
 class LampiranCreatePayload(BaseModel):
@@ -97,7 +102,13 @@ class LampiranUpdatePayload(LampiranCreatePayload):
 class LampiranRecord(BaseModel):
     id: str
     submitted_at: datetime
-    spop_id: Optional[str] = None
+    data_spop: Optional["SpopInfo"] = None
+    no_formulir: Optional[str] = None
+    nama_petugas: Optional[str] = None
+    nip: Optional[str] = None
+    kelas_bangunan_njop: Optional["NjopClass"] = None
+    tanggal_pelaksanaan: Optional[datetime] = None
+    status: Optional[str] = None
 
     nop: Optional[str] = None
     jumlah_bangunan: Optional[int] = None
@@ -218,3 +229,20 @@ class LampiranDeleteResponse(BaseModel):
 class StatusInfo(BaseModel):
     id: Optional[int] = None
     nama: Optional[str] = None
+
+
+class NjopClass(BaseModel):
+    id: Optional[int] = None
+    kelas: Optional[str] = None
+    njop: Optional[int] = None
+
+
+class LampiranStaffPayload(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    nama_petugas: Optional[str] = None
+    nip: Optional[str] = None
+    kelas_bangunan_njop: Optional[int] = None
+    tanggal_pelaksanaan: Optional[datetime] = None
+    foto_objek_pajak: Optional[str] = None
+    status: Optional[str] = None

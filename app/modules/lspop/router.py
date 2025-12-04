@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
-from typing import List, Optional
+from typing import Dict, List, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
@@ -36,8 +36,18 @@ from app.modules.spop.models import RefKelasBangunanNjop, RefKelasBumiNjop, Spop
 router = APIRouter(prefix="/lspop", tags=["lspop"])
 
 
-def _to_record(row: LampiranSpop, lookups: Optional[dict] = None) -> schemas.LampiranRecord:
+def _to_record(
+    row: LampiranSpop,
+    lookups: Optional[dict] = None,
+    spop_map: Optional[Dict[str, schemas.SpopInfo]] = None,
+    kelas_map: Optional[Dict[int, schemas.NjopClass]] = None,
+) -> schemas.LampiranRecord:
     lookups = lookups or {}
+    spop_data = (spop_map or {}).get(row.spop_id)
+    kelas_obj = None
+    if row.kelas_bangunan_njop is not None:
+        kelas_obj = (kelas_map or {}).get(row.kelas_bangunan_njop)
+
     def info(field: str, value: Optional[int]) -> Optional[schemas.StatusInfo]:
         if value is None:
             return None
@@ -45,8 +55,14 @@ def _to_record(row: LampiranSpop, lookups: Optional[dict] = None) -> schemas.Lam
 
     return schemas.LampiranRecord(
         id=row.id,
-        spop_id=row.spop_id,
         submitted_at=row.submitted_at,
+        data_spop=spop_data,
+        no_formulir=row.no_formulir,
+        nama_petugas=row.nama_petugas,
+        nip=row.nip,
+        kelas_bangunan_njop=kelas_obj,
+        tanggal_pelaksanaan=row.tanggal_pelaksanaan,
+        status=row.status,
         nop=row.nop,
         jumlah_bangunan=row.jumlah_bangunan,
         bangunan_ke=row.bangunan_ke,
@@ -145,6 +161,38 @@ async def _build_lookups(session: SessionDep, rows: List[LampiranSpop]) -> dict:
     return lookups
 
 
+async def _build_kelas_bangunan_map(session: SessionDep, rows: List[LampiranSpop]) -> Dict[int, schemas.NjopClass]:
+    ids = {row.kelas_bangunan_njop for row in rows if row.kelas_bangunan_njop is not None}
+    if not ids:
+        return {}
+    result = await session.execute(select(RefKelasBangunanNjop).where(RefKelasBangunanNjop.id.in_(ids)))
+    kelas_map: Dict[int, schemas.NjopClass] = {}
+    for row in result.scalars():
+        kelas_value = getattr(row, "kelas", None)
+        kelas_str = str(kelas_value) if kelas_value is not None else None
+        kelas_map[row.id] = schemas.NjopClass(id=row.id, kelas=kelas_str, njop=getattr(row, "njop", None))
+    return kelas_map
+
+
+async def _build_spop_map(session: SessionDep, rows: List[LampiranSpop]) -> Dict[str, schemas.SpopInfo]:
+    spop_ids = {row.spop_id for row in rows if row.spop_id}
+    if not spop_ids:
+        return {}
+    result = await session.execute(
+        select(
+            SpopRegistration.id,
+            SpopRegistration.nama_lengkap,
+            SpopRegistration.nama_awal,
+            SpopRegistration.status,
+        ).where(SpopRegistration.id.in_(spop_ids))
+    )
+    spop_map: Dict[str, schemas.SpopInfo] = {}
+    for row in result:
+        nama = row.nama_lengkap or row.nama_awal
+        spop_map[row.id] = schemas.SpopInfo(nama=nama, status_akhir=row.status)
+    return spop_map
+
+
 async def _get_spop_by_nop(session: SessionDep, nop: str) -> SpopRegistration:
     if not nop:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="NOP wajib diisi")
@@ -170,6 +218,14 @@ async def _load_payload(request: Request, model_cls):
         data = dict(form)
     for key in ("_method", "_put", "_patch"):
         data.pop(key, None)
+    if model_cls is schemas.LampiranStaffPayload:
+        cleaned = {}
+        for key, value in data.items():
+            if isinstance(value, str) and value.strip() == "":
+                cleaned[key] = None
+            else:
+                cleaned[key] = value
+        data = cleaned
     return model_cls(**data)
 
 
@@ -353,6 +409,7 @@ async def _create_sppt_for_lspop(
 
 
 @router.post("", response_model=schemas.LampiranResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=schemas.LampiranResponse, status_code=status.HTTP_201_CREATED, include_in_schema=False)
 async def create_lspop(
     request: Request,
     session: SessionDep,
@@ -367,6 +424,7 @@ async def create_lspop(
             value = value.strip()
         setattr(entity, key, value)
     entity.spop_id = spop_row.id
+    entity.no_formulir = datetime.now().strftime("%Y.%m.%d.%H.%M")
 
     session.add(entity)
     await session.commit()
@@ -378,7 +436,11 @@ async def create_lspop(
         lookups = await _build_lookups(session, [entity])
     except MissingGreenlet:
         lookups = {}
-    record = _to_record(entity, lookups)
+    spop_map = {
+        spop_row.id: schemas.SpopInfo(nama=spop_row.nama_lengkap or spop_row.nama_awal, status_akhir=spop_row.status)
+    }
+    kelas_map = await _build_kelas_bangunan_map(session, [entity])
+    record = _to_record(entity, lookups, spop_map, kelas_map)
     return schemas.LampiranResponse(message="Lampiran SPOP berhasil dibuat", data=record, sppt=sppt_record)
 
 
@@ -404,7 +466,9 @@ async def list_lspop(
     rows = result.scalars().all()
 
     lookups = await _build_lookups(session, rows)
-    data: List[schemas.LampiranRecord] = [_to_record(row, lookups) for row in rows]
+    spop_map = await _build_spop_map(session, rows)
+    kelas_map = await _build_kelas_bangunan_map(session, rows)
+    data: List[schemas.LampiranRecord] = [_to_record(row, lookups, spop_map, kelas_map) for row in rows]
     pages = (total + limit - 1) // limit if total else 0
     meta = schemas.Pagination(
         total=total,
@@ -427,7 +491,9 @@ async def get_lspop(
     if entity is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lampiran tidak ditemukan")
     lookups = await _build_lookups(session, [entity])
-    record = _to_record(entity, lookups)
+    spop_map = await _build_spop_map(session, [entity])
+    kelas_map = await _build_kelas_bangunan_map(session, [entity])
+    record = _to_record(entity, lookups, spop_map, kelas_map)
     return schemas.LampiranResponse(message="Detail lampiran SPOP berhasil diambil", data=record)
 
 
@@ -454,7 +520,9 @@ async def update_lspop(
     await session.commit()
     await session.refresh(entity)
     lookups = await _build_lookups(session, [entity])
-    record = _to_record(entity, lookups)
+    spop_map = await _build_spop_map(session, [entity])
+    kelas_map = await _build_kelas_bangunan_map(session, [entity])
+    record = _to_record(entity, lookups, spop_map, kelas_map)
     return schemas.LampiranResponse(message="Lampiran SPOP berhasil diperbarui", data=record)
 
 
@@ -471,3 +539,46 @@ async def delete_lspop(
     await session.delete(entity)
     await session.commit()
     return schemas.LampiranDeleteResponse(message="Lampiran SPOP berhasil dihapus")
+
+
+@router.put("/staff/{lampiran_id}", response_model=schemas.LampiranResponse)
+@router.post("/staff/{lampiran_id}", response_model=schemas.LampiranResponse, include_in_schema=False)
+async def update_lspop_staff(
+    lampiran_id: str,
+    request: Request,
+    session: SessionDep,
+    current_user: CurrentUserDep,
+) -> schemas.LampiranResponse:
+    entity = await session.get(LampiranSpop, lampiran_id)
+    if entity is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lampiran tidak ditemukan")
+
+    payload = await _load_payload(request, schemas.LampiranStaffPayload)
+    updates = payload.model_dump(exclude_unset=True, exclude_none=True)
+    applied_changes = False
+    for key, value in updates.items():
+        if isinstance(value, str):
+            value = value.strip()
+            if value == "":
+                value = None
+        if key == "kelas_bangunan_njop" and value is not None:
+            try:
+                value = int(value)
+            except (TypeError, ValueError):
+                value = None
+        if value is None:
+            continue
+        if hasattr(entity, key):
+            current_value = getattr(entity, key)
+            if current_value != value:
+                setattr(entity, key, value)
+                applied_changes = True
+
+    if applied_changes:
+        await session.commit()
+        await session.refresh(entity)
+    lookups = await _build_lookups(session, [entity])
+    spop_map = await _build_spop_map(session, [entity])
+    kelas_map = await _build_kelas_bangunan_map(session, [entity])
+    record = _to_record(entity, lookups, spop_map, kelas_map)
+    return schemas.LampiranResponse(message="Data petugas LSPOP berhasil diperbarui", data=record)
